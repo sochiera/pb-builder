@@ -97,8 +97,12 @@ def analyze(selection: dict[str, str], budget: int | None = None) -> dict:
             issue("info", f"Obudowa obsługuje płytę główną w formacie {board_form_factor}.")
         else:
             issue("blocking", f"Obudowa nie mieści płyty głównej w formacie {board_form_factor}.")
-    if cpu and cooler and cpu["socket"] not in cooler["supportedSockets"]:
-        issue("blocking", f"Chłodzenie nie obsługuje podstawki {cpu['socket']} procesora.")
+    if cpu and cooler:
+        socket = cpu["socket"]
+        if socket in cooler["supportedSockets"]:
+            issue("info", f"Chłodzenie {cooler['name']} obsługuje podstawkę {socket} procesora.")
+        else:
+            issue("blocking", f"Chłodzenie nie obsługuje podstawki {socket} procesora.")
     if ram and ram["modules"] == 1:
         issue("warning", "Jeden moduł RAM ogranicza pracę w dwóch kanałach pamięci.")
     if gpu and psu and psu["pcie"] < gpu["connectors"]:

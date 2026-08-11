@@ -1,22 +1,97 @@
 import base64
 import json
+import os
 from pathlib import Path
 import re
 import shutil
+import socket
+import struct
 import subprocess
 import tempfile
 import threading
+import time
 from functools import partial
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer
 import unittest
 from urllib.error import HTTPError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from app import Handler, analyze, create_server
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def read_socket_bytes(sock, length):
+    chunks = []
+    while sum(map(len, chunks)) < length:
+        chunk = sock.recv(length - sum(map(len, chunks)))
+        if not chunk:
+            raise RuntimeError("Chromium DevTools connection closed unexpectedly")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def send_websocket_frame(sock, payload, opcode=1):
+    mask = os.urandom(4)
+    masked_payload = bytes(value ^ mask[index % 4] for index, value in enumerate(payload))
+    length = len(payload)
+    if length < 126:
+        header = bytes([0x80 | opcode, 0x80 | length])
+    elif length <= 0xFFFF:
+        header = bytes([0x80 | opcode, 0xFE]) + struct.pack("!H", length)
+    else:
+        header = bytes([0x80 | opcode, 0xFF]) + struct.pack("!Q", length)
+    sock.sendall(header + mask + masked_payload)
+
+
+def read_websocket_message(sock):
+    first, second = read_socket_bytes(sock, 2)
+    opcode = first & 0x0F
+    length = second & 0x7F
+    if length == 126:
+        length = struct.unpack("!H", read_socket_bytes(sock, 2))[0]
+    elif length == 127:
+        length = struct.unpack("!Q", read_socket_bytes(sock, 8))[0]
+    mask = read_socket_bytes(sock, 4) if second & 0x80 else None
+    payload = read_socket_bytes(sock, length)
+    if mask:
+        payload = bytes(value ^ mask[index % 4] for index, value in enumerate(payload))
+    if opcode == 9:
+        send_websocket_frame(sock, payload, opcode=10)
+        return read_websocket_message(sock)
+    if opcode == 8:
+        raise RuntimeError("Chromium DevTools connection closed")
+    if opcode != 1:
+        return read_websocket_message(sock)
+    return json.loads(payload)
+
+
+def connect_to_cdp(websocket_url):
+    parsed = urlsplit(websocket_url)
+    sock = socket.create_connection((parsed.hostname, parsed.port), timeout=10)
+    key = base64.b64encode(os.urandom(16)).decode()
+    request = (
+        f"GET {parsed.path}{f'?{parsed.query}' if parsed.query else ''} HTTP/1.1\r\n"
+        f"Host: {parsed.hostname}:{parsed.port}\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        f"Sec-WebSocket-Key: {key}\r\n"
+        "Sec-WebSocket-Version: 13\r\n\r\n"
+    )
+    try:
+        sock.sendall(request.encode())
+        response = b""
+        while b"\r\n\r\n" not in response:
+            response += sock.recv(4096)
+        if b" 101 " not in response.split(b"\r\n", 1)[0]:
+            raise RuntimeError(f"Chromium DevTools websocket handshake failed: {response!r}")
+        return sock
+    except Exception:
+        sock.close()
+        raise
 
 BROWSER_SETUP = """
 <script>
@@ -122,14 +197,127 @@ const publish = (attribute, value) => {
 </script>
 """
 
+BROWSER_COOLER_EXERCISE = """
+<script>
+let stage = "boot";
+const waitFor = (predicate) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 5000;
+  const poll = () => {
+    let result;
+    try {
+      result = predicate();
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    if (result) {
+      resolve(result);
+    } else if (Date.now() >= deadline) {
+      reject(new Error("Timed out waiting for browser state"));
+    } else {
+      setTimeout(poll, 25);
+    }
+  };
+  poll();
+});
+
+const visible = (selector) => document.querySelector(selector).textContent.replace(/\\s/g, " ").trim();
+const publish = (attribute, value) => {
+  document.documentElement.setAttribute(
+    attribute,
+    btoa(unescape(encodeURIComponent(JSON.stringify(value))))
+  );
+};
+const issues = () => Array.from(document.querySelectorAll("#issues li"), (item) => ({
+  level: item.className,
+  text: item.textContent.replace(/\\s/g, " ").trim(),
+}));
+
+(async () => {
+  try {
+    await waitFor(() =>
+      document.querySelector('select[name="cpu"]') &&
+      document.querySelector('select[name="cooler"]') &&
+      visible("#total") !== "-"
+    );
+    const cpuField = document.querySelector('select[name="cpu"]');
+    const coolerField = document.querySelector('select[name="cooler"]');
+    window.__testRequests.length = 0;
+
+    stage = "keyboard access";
+    coolerField.focus();
+    const keyboardReady = coolerField.tagName === "SELECT" &&
+      coolerField.tabIndex >= 0 &&
+      document.activeElement === coolerField;
+    if (!keyboardReady) throw new Error("cooler select did not accept keyboard focus");
+    document.documentElement.setAttribute("data-keyboard-ready", "cooler");
+
+    stage = "cooler change";
+    await waitFor(() => coolerField.value === "alpine-23");
+    await waitFor(() => window.__testRequests.find((request) =>
+      request.selection && request.selection.cooler === "alpine-23"
+    ));
+    await waitFor(() => visible("#status") === "Zestaw wymaga zmian" &&
+      issues().some((issue) =>
+        issue.level === "blocking" &&
+        issue.text.includes("AM5") &&
+        issue.text.toLowerCase().includes("podstawk")
+      )
+    );
+
+    stage = "compatible cooler";
+    document.documentElement.setAttribute("data-keyboard-ready", "restore");
+    await waitFor(() => coolerField.value === "fortis-5");
+    await waitFor(() => window.__testRequests.find((request) =>
+      request.selection && request.selection.cooler === "fortis-5"
+    ));
+
+    stage = "cpu change";
+    cpuField.value = "r7-7800x3d";
+    cpuField.dispatchEvent(new Event("input", { bubbles: true }));
+    await waitFor(() => window.__testRequests.find((request) =>
+      request.selection &&
+      request.selection.cpu === "r7-7800x3d" &&
+      request.selection.cooler === "fortis-5"
+    ));
+
+    stage = "restore compatible profile";
+    cpuField.value = "r5-7600";
+    cpuField.dispatchEvent(new Event("input", { bubbles: true }));
+    await waitFor(() => window.__testRequests.find((request) =>
+      request.selection &&
+      request.selection.cpu === "r5-7600" &&
+      request.selection.cooler === "fortis-5"
+    ));
+    await waitFor(() => visible("#status") === "Zestaw jest kompatybilny");
+
+    publish("data-cooler-browser-test", {
+      coolerOptions: Array.from(coolerField.options, (option) => option.value),
+      keyboardReady,
+      mobileLayout: window.matchMedia("(max-width: 760px)").matches,
+      issues: issues(),
+      status: visible("#status"),
+    });
+  } catch (error) {
+    publish("data-cooler-browser-test-error", `${stage}: ${error.stack || error}`);
+  }
+})();
+</script>
+"""
+
 
 class BrowserTestHandler(Handler):
     def do_GET(self):
-        if self.path == "/__browser_test__":
+        exercises = {
+            "/__browser_test__": BROWSER_EXERCISE,
+            "/__cooler_test__": BROWSER_COOLER_EXERCISE,
+        }
+        exercise = exercises.get(self.path)
+        if exercise is not None:
             page = (PROJECT_ROOT / "client" / "index.html").read_text()
             page = page.replace(
                 '  <script src="app.js"></script>',
-                f"{BROWSER_SETUP}  <script src=\"app.js\"></script>{BROWSER_EXERCISE}",
+                f"{BROWSER_SETUP}  <script src=\"app.js\"></script>{exercise}",
             )
             encoded = page.encode()
             self.send_response(HTTPStatus.OK)
@@ -388,7 +576,7 @@ class ServerTest(unittest.TestCase):
             self.assertEqual(error.exception.code, 404)
             error.exception.close()
 
-    def test_client_updates_analysis_and_formats_totals_in_browser(self):
+    def run_browser_page(self, path, keyboard_steps=()):
         browser = shutil.which("chromium-browser") or shutil.which("chromium")
         if browser is None:
             self.skipTest("headless Chromium is not installed")
@@ -401,28 +589,140 @@ class ServerTest(unittest.TestCase):
         browser_thread.start()
         try:
             with tempfile.TemporaryDirectory(prefix="pb-builder-browser-") as profile:
-                result = subprocess.run(
+                command = [
+                    browser,
+                    "--headless=new",
+                    "--no-sandbox",
+                    "--disable-gpu",
+                    "--disable-dev-shm-usage",
+                    "--disable-extensions",
+                    "--window-size=600,800",
+                    f"--user-data-dir={profile}",
+                    f"http://127.0.0.1:{browser_server.server_port}{path}",
+                ]
+                if not keyboard_steps:
+                    return subprocess.run(
+                        [*command, "--virtual-time-budget=10000", "--dump-dom"],
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                    )
+
+                debug_socket = socket.socket()
+                debug_socket.bind(("127.0.0.1", 0))
+                debug_port = debug_socket.getsockname()[1]
+                debug_socket.close()
+                process = subprocess.Popen(
                     [
-                        browser,
-                        "--headless=new",
-                        "--no-sandbox",
-                        "--disable-gpu",
-                        "--disable-dev-shm-usage",
-                        "--disable-extensions",
-                        "--window-size=600,800",
-                        "--virtual-time-budget=10000",
-                        f"--user-data-dir={profile}",
-                        "--dump-dom",
-                        f"http://127.0.0.1:{browser_server.server_port}/__browser_test__",
+                        *command,
+                        f"--remote-debugging-port={debug_port}",
+                        "--remote-allow-origins=*",
                     ],
-                    capture_output=True,
-                    text=True,
-                    timeout=20,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
                 )
+                cdp_socket = None
+                command_id = 0
+
+                def cdp_call(method, params=None, session_id=None):
+                    nonlocal command_id
+                    command_id += 1
+                    message = {"id": command_id, "method": method}
+                    if params is not None:
+                        message["params"] = params
+                    if session_id is not None:
+                        message["sessionId"] = session_id
+                    send_websocket_frame(cdp_socket, json.dumps(message).encode())
+                    while True:
+                        response = read_websocket_message(cdp_socket)
+                        if response.get("id") == command_id:
+                            if "error" in response:
+                                raise RuntimeError(response["error"])
+                            return response["result"]
+
+                try:
+                    deadline = time.monotonic() + 10
+                    target = None
+                    while target is None and time.monotonic() < deadline:
+                        try:
+                            with urlopen(f"http://127.0.0.1:{debug_port}/json", timeout=1) as response:
+                                targets = json.loads(response.read().decode())
+                        except OSError:
+                            targets = []
+                        target = next((candidate for candidate in targets
+                                       if candidate["type"] == "page"
+                                       and path in candidate["url"]
+                                       and candidate.get("webSocketDebuggerUrl")), None)
+                        if target is None:
+                            time.sleep(0.025)
+                    if target is None:
+                        raise TimeoutError("Chromium page target did not start")
+
+                    cdp_socket = connect_to_cdp(target["webSocketDebuggerUrl"])
+                    session_id = cdp_call("Target.attachToTarget", {
+                        "targetId": target["id"],
+                        "flatten": True,
+                    })["sessionId"]
+
+                    def evaluate(expression):
+                        result = cdp_call(
+                            "Runtime.evaluate",
+                            {"expression": expression, "returnByValue": True},
+                            session_id,
+                        )
+                        if "exceptionDetails" in result:
+                            raise RuntimeError(result["exceptionDetails"])
+                        return result["result"].get("value")
+
+                    def wait_for(expression):
+                        deadline = time.monotonic() + 10
+                        while time.monotonic() < deadline:
+                            if evaluate(expression):
+                                return
+                            time.sleep(0.025)
+                        raise TimeoutError(f"Timed out waiting for {expression}")
+
+                    key_codes = {"ArrowDown": 40, "ArrowUp": 38}
+                    for marker, key in keyboard_steps:
+                        wait_for(f"document.documentElement.getAttribute('data-keyboard-ready') === {json.dumps(marker)}")
+                        key_code = key_codes[key]
+                        for event_type in ("keyDown", "keyUp"):
+                            cdp_call("Input.dispatchKeyEvent", {
+                                "type": event_type,
+                                "key": key,
+                                "code": key,
+                                "windowsVirtualKeyCode": key_code,
+                                "nativeVirtualKeyCode": key_code,
+                            }, session_id)
+
+                    wait_for(
+                        "document.documentElement.hasAttribute('data-cooler-browser-test') || "
+                        "document.documentElement.hasAttribute('data-cooler-browser-test-error')"
+                    )
+                    dom = evaluate("document.documentElement.outerHTML")
+                    result = subprocess.CompletedProcess(command, 0, dom, "")
+                except Exception as error:
+                    result = subprocess.CompletedProcess(command, 1, "", str(error))
+                finally:
+                    if cdp_socket is not None:
+                        cdp_socket.close()
+                    process.terminate()
+                    try:
+                        _, stderr = process.communicate(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        _, stderr = process.communicate()
+                    if stderr:
+                        result.stderr = f"{result.stderr}\n{stderr.decode(errors='replace')}".strip()
+                return result
         finally:
             browser_server.shutdown()
             browser_server.server_close()
             browser_thread.join()
+
+    def test_client_updates_analysis_and_formats_totals_in_browser(self):
+        result = self.run_browser_page("/__browser_test__")
 
         self.assertEqual(result.returncode, 0, result.stderr)
         error_match = re.search(r'data-browser-test-error="([^"]+)"', result.stdout)
@@ -459,6 +759,37 @@ class ServerTest(unittest.TestCase):
             self.assertEqual(parts[-1], "zł")
             self.assertEqual("".join(parts[:-1]), expected)
         self.assertEqual(browser_report["status"], "Zestaw jest kompatybilny")
+
+    def test_cooler_selection_refreshes_analysis_and_explains_socket_in_browser(self):
+        result = self.run_browser_page(
+            "/__cooler_test__",
+            (("cooler", "ArrowDown"), ("restore", "ArrowUp")),
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        error_match = re.search(r'data-cooler-browser-test-error="([^"]+)"', result.stdout)
+        if error_match:
+            error = base64.b64decode(error_match.group(1)).decode()
+            self.fail(f"browser behavior test failed: {error}")
+
+        result_match = re.search(r'data-cooler-browser-test="([^"]+)"', result.stdout)
+        self.assertIsNotNone(
+            result_match,
+            f"browser behavior test produced no result:\n{result.stderr}\n{result.stdout}",
+        )
+        browser_report = json.loads(base64.b64decode(result_match.group(1)).decode())
+
+        self.assertIn("fortis-5", browser_report["coolerOptions"])
+        self.assertTrue(browser_report["keyboardReady"])
+        self.assertTrue(browser_report["mobileLayout"])
+        self.assertEqual(browser_report["status"], "Zestaw jest kompatybilny")
+        self.assertTrue(any(
+            issue["level"] == "info"
+            and "chłodzenie" in issue["text"].lower()
+            and "AM5" in issue["text"]
+            and "podstawk" in issue["text"].lower()
+            for issue in browser_report["issues"]
+        ), "compatible cooler result must explain CPU socket support")
 
     def test_rejects_json_with_invalid_structure(self):
         request = Request(
