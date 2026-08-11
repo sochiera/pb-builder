@@ -403,14 +403,114 @@ let stage = "boot";
 """
 
 
+BROWSER_PERSISTENCE_EXERCISE = """
+<script>
+const persistencePhase = new URLSearchParams(window.location.search).get("phase");
+const persistenceProfiles = {
+  seed: {
+    selection: {
+      cpu: "r7-7800x3d",
+      motherboard: "b550",
+      case: "atx-airflow",
+      cooler: "alpine-23",
+      disk: "sata-1tb",
+      ram: "ddr4-32",
+      gpu: "rtx-5060",
+      psu: "550w",
+    },
+    budget: 4800,
+  },
+  changed: {
+    selection: {
+      cpu: "r5-7600",
+      motherboard: "b650m",
+      case: "m-atx-compact",
+      cooler: "fortis-5",
+      disk: "nvme-1tb",
+      ram: "ddr5-32",
+      gpu: "rtx-5070",
+      psu: "650w",
+    },
+    budget: 7000,
+  },
+};
+
+const persistenceState = () => ({
+  selection: Object.fromEntries(Array.from(
+    document.querySelectorAll("#component-fields select"),
+    (field) => [field.name, field.value],
+  )),
+  budget: Number(document.querySelector("#budget").value),
+});
+
+const analysisRequestForState = () => {
+  const state = persistenceState();
+  return window.__testRequests.find((request) =>
+    request.selection &&
+    request.budget === state.budget &&
+    Object.entries(state.selection).every(([name, value]) => request.selection[name] === value)
+  );
+};
+
+const setPersistenceField = (name, value) => {
+  const field = name === "budget"
+    ? document.querySelector("#budget")
+    : document.querySelector(`[name="${name}"]`);
+  field.value = String(value);
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+};
+
+(async () => {
+  let stage = "boot";
+  try {
+    await waitFor(() =>
+      document.querySelector('select[name="cpu"]') &&
+      document.querySelector('select[name="psu"]') &&
+      document.querySelector("#budget") &&
+      document.querySelector("#total") &&
+      visible("#total") !== "-"
+    );
+
+    const profile = persistenceProfiles[persistencePhase];
+    if (profile) {
+      stage = `${persistencePhase} input`;
+      Object.entries(profile.selection).forEach(([name, value]) => setPersistenceField(name, value));
+      setPersistenceField("budget", profile.budget);
+      await waitFor(() => {
+        const state = persistenceState();
+        return state.budget === profile.budget &&
+          Object.entries(profile.selection).every(([name, value]) => state.selection[name] === value);
+      });
+    } else {
+      stage = "restore";
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const analysisRequest = await waitFor(() => analysisRequestForState());
+
+    publish("data-persistence-test", {
+      phase: persistencePhase,
+      ...persistenceState(),
+      analysisRequest,
+      total: visible("#total"),
+      status: visible("#status"),
+    });
+  } catch (error) {
+    publish("data-persistence-test-error", `${stage}: ${error.stack || error}`);
+  }
+})();
+</script>
+"""
+
+
 class BrowserTestHandler(Handler):
     def do_GET(self):
         exercises = {
             "/__browser_test__": BROWSER_EXERCISE,
             "/__cooler_test__": BROWSER_COOLER_EXERCISE,
             "/__disk_test__": BROWSER_DISK_EXERCISE,
+            "/__persistence_test__": BROWSER_PERSISTENCE_EXERCISE,
         }
-        exercise = exercises.get(self.path)
+        exercise = exercises.get(urlsplit(self.path).path)
         if exercise is not None:
             page = (PROJECT_ROOT / "client" / "index.html").read_text()
             page = page.replace(
@@ -944,6 +1044,71 @@ class ServerTest(unittest.TestCase):
             browser_server.server_close()
             browser_thread.join()
 
+    def run_browser_persistence_pages(self):
+        browser = shutil.which("chromium-browser") or shutil.which("chromium")
+        if browser is None:
+            self.skipTest("headless Chromium is not installed")
+
+        browser_server = ThreadingHTTPServer(
+            ("127.0.0.1", 0),
+            partial(BrowserTestHandler, directory=str(PROJECT_ROOT / "client")),
+        )
+        browser_thread = threading.Thread(target=browser_server.serve_forever)
+        browser_thread.start()
+        try:
+            def run_phase(profile, phase):
+                command = [
+                    browser,
+                    "--headless=new",
+                    "--no-sandbox",
+                    "--disable-gpu",
+                    "--disable-dev-shm-usage",
+                    "--disable-extensions",
+                    "--window-size=600,800",
+                    f"--user-data-dir={profile}",
+                    f"http://127.0.0.1:{browser_server.server_port}/__persistence_test__?phase={phase}",
+                    "--virtual-time-budget=10000",
+                    "--dump-dom",
+                ]
+                return subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
+
+            with (
+                tempfile.TemporaryDirectory(prefix="pb-builder-persistence-") as profile,
+                tempfile.TemporaryDirectory(prefix="pb-builder-fresh-") as fresh_profile,
+            ):
+                results = {
+                    phase: run_phase(profile, phase)
+                    for phase in ("seed", "restore-initial", "changed", "restore-latest")
+                }
+                results["fresh"] = run_phase(fresh_profile, "fresh")
+                return results
+        finally:
+            browser_server.shutdown()
+            browser_server.server_close()
+            browser_thread.join()
+
+    def read_persistence_state(self, result, phase):
+        self.assertEqual(result.returncode, 0, result.stderr)
+        error_match = re.search(r'data-persistence-test-error="([^"]+)"', result.stdout)
+        if error_match:
+            error = base64.b64decode(error_match.group(1)).decode()
+            self.fail(f"persistence browser behavior test failed during {phase}: {error}")
+
+        result_match = re.search(r'data-persistence-test="([^"]+)"', result.stdout)
+        self.assertIsNotNone(
+            result_match,
+            f"persistence browser behavior test produced no result during {phase}:\n"
+            f"{result.stderr}\n{result.stdout}",
+        )
+        state = json.loads(base64.b64decode(result_match.group(1)).decode())
+        self.assertEqual(state["phase"], phase)
+        return state
+
     def test_client_updates_analysis_and_formats_totals_in_browser(self):
         result = self.run_browser_page("/__browser_test__")
 
@@ -1089,6 +1254,88 @@ class ServerTest(unittest.TestCase):
             and "nie obsługuje" in issue["text"].lower()
             for issue in browser_report["issues"]
         ))
+
+    def test_selection_and_budget_survive_reopen_and_restore_latest_state(self):
+        results = self.run_browser_persistence_pages()
+        states = {
+            phase: self.read_persistence_state(result, phase)
+            for phase, result in results.items()
+        }
+        fresh = {
+            "selection": {
+                "cpu": "r5-7600",
+                "motherboard": "b650m",
+                "case": "m-atx-compact",
+                "cooler": "fortis-5",
+                "disk": "nvme-1tb",
+                "ram": "ddr5-32",
+                "gpu": "rtx-5070",
+                "psu": "650w",
+            },
+            "budget": 5500,
+        }
+        initial = {
+            "selection": {
+                "cpu": "r7-7800x3d",
+                "motherboard": "b550",
+                "case": "atx-airflow",
+                "cooler": "alpine-23",
+                "disk": "sata-1tb",
+                "ram": "ddr4-32",
+                "gpu": "rtx-5060",
+                "psu": "550w",
+            },
+            "budget": 4800,
+        }
+        latest = {
+            "selection": {
+                "cpu": "r5-7600",
+                "motherboard": "b650m",
+                "case": "m-atx-compact",
+                "cooler": "fortis-5",
+                "disk": "nvme-1tb",
+                "ram": "ddr5-32",
+                "gpu": "rtx-5070",
+                "psu": "650w",
+            },
+            "budget": 7000,
+        }
+
+        self.assertEqual(
+            {"selection": states["fresh"]["selection"], "budget": states["fresh"]["budget"]},
+            fresh,
+            "a fresh browser profile must start with the default configuration",
+        )
+        self.assertNotEqual(states["fresh"]["total"], "-", "fresh form must produce an analysis")
+
+        for label, phase, expected, message in (
+            (
+                "initial state",
+                "restore-initial",
+                initial,
+                "reopening the browser must restore every selected component and the budget",
+            ),
+            (
+                "latest state",
+                "restore-latest",
+                latest,
+                "reopening the browser must restore the latest changed component set and budget",
+            ),
+        ):
+            with self.subTest(state=label):
+                self.assertEqual(
+                    {"selection": states[phase]["selection"], "budget": states[phase]["budget"]},
+                    expected,
+                    message,
+                )
+                self.assertEqual(
+                    {
+                        "selection": states[phase]["analysisRequest"]["selection"],
+                        "budget": states[phase]["analysisRequest"]["budget"],
+                    },
+                    expected,
+                    "reopening the browser must analyze the restored selection and budget",
+                )
 
     def test_rejects_json_with_invalid_structure(self):
         request = Request(

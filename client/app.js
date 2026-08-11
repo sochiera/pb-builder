@@ -1,5 +1,6 @@
 const labels = { cpu: "Procesor", motherboard: "Płyta główna", case: "Obudowa", cooler: "Chłodzenie", disk: "Dysk", ram: "Pamięć RAM", gpu: "Karta graficzna", psu: "Zasilacz" };
 const categoryFields = Object.entries(labels);
+const storageKey = "pc-builder-configuration";
 let catalog = {};
 let analysisVersion = 0;
 
@@ -12,6 +13,42 @@ function selection() {
   ]));
 }
 
+function configuration() {
+  return {
+    selection: selection(),
+    budget: Number(document.querySelector("#budget").value),
+  };
+}
+
+function saveConfiguration() {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(configuration()));
+  } catch {
+    // Storage may be unavailable, but the form should remain usable.
+  }
+}
+
+function restoreConfiguration() {
+  let saved;
+  try {
+    saved = JSON.parse(localStorage.getItem(storageKey));
+  } catch {
+    return;
+  }
+  if (!saved || typeof saved !== "object") return;
+
+  categoryFields.forEach(([category]) => {
+    const value = saved.selection?.[category];
+    const field = document.querySelector(`[name="${category}"]`);
+    if (typeof value === "string" && Array.from(field.options).some((option) => option.value === value)) {
+      field.value = value;
+    }
+  });
+  if (Number.isFinite(saved.budget)) {
+    document.querySelector("#budget").value = String(saved.budget);
+  }
+}
+
 function renderCatalog() {
   const fields = document.querySelector("#component-fields");
   fields.innerHTML = categoryFields.map(([category, label]) => `
@@ -21,7 +58,7 @@ function renderCatalog() {
 
 async function refresh() {
   const version = ++analysisVersion;
-  const response = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ selection: selection(), budget: Number(document.querySelector("#budget").value) }) });
+  const response = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(configuration()) });
   const report = await response.json();
   if (version !== analysisVersion) return;
   const status = document.querySelector("#status");
@@ -37,7 +74,11 @@ async function refresh() {
 async function boot() {
   catalog = await fetch("/api/catalog").then((response) => response.json());
   renderCatalog();
-  document.querySelector("#builder").addEventListener("input", refresh);
+  restoreConfiguration();
+  document.querySelector("#builder").addEventListener("input", () => {
+    saveConfiguration();
+    refresh();
+  });
   refresh();
 }
 

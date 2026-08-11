@@ -24,7 +24,7 @@ Jako osoba składająca komputer chcę dobrać dysk i zobaczyć, czy można go p
 - Sprawdzenie: uruchom demo, wybierz kolejno dysk możliwy i niemożliwy do podłączenia do wybranej płyty, a następnie potwierdź, że ocena zestawu zmienia się i wyjaśnia przyczynę.
 - Poza zakresem: wydajność, pojemność i opłacalność dysku, liczba dostępnych złączy oraz kolizje współdzielonych linii.
 
-## US-004 — Składający wraca do zachowanego zestawu  [nowa]
+## US-004 — Składający wraca do zachowanego zestawu  [w toku]
 
 Jako osoba składająca komputer chcę po ponownym otwarciu konfiguratora wrócić do wybranego zestawu, żeby kontynuować decyzję zakupową bez ponownego dobierania części.
 
