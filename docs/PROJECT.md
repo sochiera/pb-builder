@@ -10,7 +10,7 @@ Docelowo użytkownik wybiera części, otrzymuje wyjaśnioną ocenę techniczną
 
 ## Zobowiązanie z backlogu
 
-Dostarczone demo wybiera CPU, płytę, RAM, GPU, PSU, obudowę i chłodzenie. Na bieżąco pokazuje koszt, budżet oraz analizę socketu, typu RAM, złączy PCIe, zapasu mocy, prostego balansu CPU/GPU, formatu płyty i podstawki chłodzenia. Najbliższy przyrost rozszerza je o wybór dysku i wyjaśnioną ocenę, czy można go podłączyć do wybranej płyty głównej.
+Dostarczone demo wybiera CPU, płytę, RAM, GPU, PSU, obudowę, chłodzenie i dysk. Na bieżąco pokazuje koszt, budżet oraz analizę socketu, typu RAM, złączy PCIe, zapasu mocy, prostego balansu CPU/GPU, formatu płyty, podstawki chłodzenia i możliwości podłączenia dysku. Najbliższy przyrost pozwala zachować wybrany zestaw między wizytami, aby użytkownik nie musiał odtwarzać konfiguracji.
 
 ## Wymagania
 
