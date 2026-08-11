@@ -1,0 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;600;700;800&display=swap');
+
+:root { --ink: #182029; --paper: #f4f1e9; --line: #d6d0c3; --lime: #c9f24b; --red: #f66c61; --blue: #dceafd; }
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: var(--paper); font-family: Manrope, sans-serif; }
+main { max-width: 1180px; margin: auto; padding: 64px 28px; }
+header { max-width: 710px; margin-bottom: 48px; }
+.eyebrow, .section-title { font: 500 12px 'DM Mono', monospace; letter-spacing: .1em; }
+h1 { margin: 8px 0 16px; font-size: clamp(42px, 7vw, 82px); letter-spacing: -.075em; line-height: .94; }
+h1 em { color: #427c69; font-style: normal; }
+.lede { max-width: 600px; font-size: 18px; line-height: 1.55; }
+.workspace { display: grid; grid-template-columns: 1.1fr .9fr; border: 1px solid var(--ink); background: #fffdf8; }
+.parts { padding: 30px; border-right: 1px solid var(--ink); }
+label { display: block; margin-bottom: 21px; font-size: 14px; font-weight: 800; }
+label span { color: #64707b; font-weight: 400; }
+input, select { width: 100%; margin-top: 7px; border: 1px solid var(--line); border-radius: 3px; background: white; color: var(--ink); padding: 13px; font: 14px Manrope, sans-serif; }
+.summary { background: var(--blue); padding: 30px; }
+.status { display: flex; align-items: center; gap: 9px; margin-bottom: 28px; }
+#status-dot { width: 11px; height: 11px; border-radius: 50%; background: var(--red); }
+#status-dot.ok { background: #4c9d69; }
+dl { margin: 0 0 28px; border-top: 1px solid #b5c5dc; }
+dl div { display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid #b5c5dc; }
+dt { color: #526372; } dd { margin: 0; font-weight: 800; }
+ul { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
+li { padding: 11px; border-left: 4px solid; background: #fff; font-size: 13px; line-height: 1.45; }
+li b { display: block; margin-bottom: 2px; font-size: 11px; text-transform: uppercase; }
+.blocking { border-color: var(--red); } .warning { border-color: #e8ad25; } .info { border-color: #5780b8; }
+@media (max-width: 760px) { main { padding: 35px 16px; } .workspace { grid-template-columns: 1fr; } .parts { border-right: 0; border-bottom: 1px solid var(--ink); } }

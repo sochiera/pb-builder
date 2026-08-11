@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Składak | inteligentny konfigurator PC</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">KONFIGURATOR PC / DEMO</p>
+      <h1>Złóż zestaw,<br><em>zanim coś nie pasuje.</em></h1>
+      <p class="lede">Wybierz pięć kluczowych części. Analiza od razu sprawdzi socket, pamięć, zasilanie i balans zestawu.</p>
+    </header>
+    <section class="workspace" aria-label="Konfigurator">
+      <form id="builder" class="parts">
+        <label>Budżet <span>zł</span><input id="budget" type="number" min="0" value="5500"></label>
+        <div id="component-fields"></div>
+      </form>
+      <aside class="summary" aria-live="polite">
+        <div class="status"><span id="status-dot"></span><strong id="status">Analizuję zestaw</strong></div>
+        <dl>
+          <div><dt>Koszt części</dt><dd id="total">-</dd></div>
+          <div><dt>W budżecie</dt><dd id="remaining">-</dd></div>
+          <div><dt>Szacowany pobór</dt><dd id="power">-</dd></div>
+          <div><dt>Zalecany PSU</dt><dd id="recommended">-</dd></div>
+        </dl>
+        <section><p class="section-title">Wnioski analizy</p><ul id="issues"></ul></section>
+      </aside>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
