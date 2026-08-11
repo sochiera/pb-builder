@@ -1,4 +1,9 @@
 # Backlog
 
-1. Udostępnić uruchamialne demo wyboru pięciu komponentów z analizą kompatybilności, mocy i budżetu.
-2. Pokazać wynik analizy oraz koszt zestawu bez przeładowania strony.
+## US-001 — Składający sprawdza dopasowanie płyty do obudowy  [nowa]
+
+Jako osoba składająca komputer chcę dobrać obudowę i zobaczyć, czy mieści format wybranej płyty głównej, żeby uniknąć zakupu części, których nie da się razem zamontować.
+
+- Dlaczego teraz: PROJECT.md wskazuje obudowę i ograniczenia fizyczne jako najbliższy etap po dostarczonym demie pięciu komponentów.
+- Sprawdzenie: uruchom demo, wybierz kolejno obudowę zgodną i niezgodną z formatem płyty, a następnie potwierdź, że ocena zestawu zmienia się i wyjaśnia przyczynę.
+- Poza zakresem: dopasowanie długości karty graficznej, chłodzenia i dysków.
