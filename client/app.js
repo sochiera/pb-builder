@@ -1,4 +1,4 @@
-const labels = { cpu: "Procesor", motherboard: "Płyta główna", ram: "Pamięć RAM", gpu: "Karta graficzna", psu: "Zasilacz" };
+const labels = { cpu: "Procesor", motherboard: "Płyta główna", case: "Obudowa", ram: "Pamięć RAM", gpu: "Karta graficzna", psu: "Zasilacz" };
 let catalog = {};
 let analysisVersion = 0;
 

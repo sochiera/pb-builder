@@ -1,9 +1,15 @@
+import json
+from pathlib import Path
+import subprocess
 import threading
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from app import analyze, create_server
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class AnalysisTest(unittest.TestCase):
@@ -69,6 +75,96 @@ class AnalysisTest(unittest.TestCase):
         self.assertTrue(any(issue["level"] == "blocking" for issue in empty_report["issues"]))
         self.assertTrue(any("Nie rozpoznano" in issue["message"] for issue in unknown_report["issues"]))
 
+    def test_blocks_configuration_without_case(self):
+        report = analyze({
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+        })
+
+        self.assertTrue(any(
+            issue["level"] == "blocking" and "obudowa" in issue["message"].lower()
+            for issue in report["issues"]
+        ))
+        self.assertFalse(report["isCompatible"])
+
+    def test_blocks_configuration_with_unknown_case(self):
+        report = analyze({
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "unknown-case",
+        })
+
+        self.assertTrue(any(
+            issue["level"] == "blocking" and "obudowa" in issue["message"].lower()
+            for issue in report["issues"]
+        ))
+        self.assertFalse(report["isCompatible"])
+
+    def test_accepts_case_that_supports_motherboard_form_factor(self):
+        report = analyze({
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "m-atx-compact",
+        })
+
+        self.assertTrue(report["isCompatible"])
+        self.assertFalse(any(
+            issue["level"] == "blocking" and "format" in issue["message"].lower()
+            for issue in report["issues"]
+        ))
+
+    def test_rejects_case_that_does_not_support_motherboard_form_factor(self):
+        report = analyze({
+            "cpu": "r5-7600",
+            "motherboard": "b550",
+            "ram": "ddr4-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "m-atx-compact",
+        })
+
+        self.assertFalse(report["isCompatible"])
+        self.assertTrue(any(
+            issue["level"] == "blocking"
+            and "ATX" in issue["message"]
+            and "obudowa" in issue["message"].lower()
+            for issue in report["issues"]
+        ))
+
+    def test_includes_case_price_in_total(self):
+        report = analyze({
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "m-atx-compact",
+        })
+
+        self.assertEqual(report["total"], 4404)
+
+
+class MakefileTest(unittest.TestCase):
+    def test_hardware_profile_passes_with_required_case(self):
+        result = subprocess.run(
+            ["make", "hardware"],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("hardware profile passed", result.stdout)
+
 
 class ServerTest(unittest.TestCase):
     def setUp(self):
@@ -106,6 +202,21 @@ class ServerTest(unittest.TestCase):
 
         self.assertEqual(error.exception.code, 400)
         error.exception.close()
+
+    def test_catalog_exposes_case_and_board_form_facts(self):
+        with urlopen(f"{self.base_url}/api/catalog") as response:
+            catalog = json.loads(response.read().decode())
+
+        self.assertIn("case", catalog)
+        self.assertTrue(catalog["case"])
+        self.assertTrue(any(
+            item["id"] == "b650m" and item.get("formFactor") == "Micro-ATX"
+            for item in catalog["motherboard"]
+        ))
+        self.assertTrue(any(
+            item["id"] == "m-atx-compact" and "Micro-ATX" in item.get("supportedFormFactors", [])
+            for item in catalog["case"]
+        ))
 
 
 if __name__ == "__main__":

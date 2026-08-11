@@ -1,6 +1,6 @@
 # Backlog
 
-## US-001 — Składający sprawdza dopasowanie płyty do obudowy  [nowa]
+## US-001 — Składający sprawdza dopasowanie płyty do obudowy  [w toku]
 
 Jako osoba składająca komputer chcę dobrać obudowę i zobaczyć, czy mieści format wybranej płyty głównej, żeby uniknąć zakupu części, których nie da się razem zamontować.
 

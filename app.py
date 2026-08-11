@@ -17,8 +17,12 @@ CATALOG = {
         {"id": "r7-7800x3d", "name": "AMD Ryzen 7 7800X3D", "price": 1599, "socket": "AM5", "power": 120, "tier": 5},
     ],
     "motherboard": [
-        {"id": "b650m", "name": "MSI B650M Gaming Plus WiFi", "price": 639, "socket": "AM5", "ram": "DDR5", "power": 45},
-        {"id": "b550", "name": "ASUS TUF Gaming B550-Plus", "price": 589, "socket": "AM4", "ram": "DDR4", "power": 40},
+        {"id": "b650m", "name": "MSI B650M Gaming Plus WiFi", "price": 639, "socket": "AM5", "ram": "DDR5", "formFactor": "Micro-ATX", "power": 45},
+        {"id": "b550", "name": "ASUS TUF Gaming B550-Plus", "price": 589, "socket": "AM4", "ram": "DDR4", "formFactor": "ATX", "power": 40},
+    ],
+    "case": [
+        {"id": "m-atx-compact", "name": "Cooler Master Q300L V2", "price": 249, "supportedFormFactors": ["Micro-ATX", "Mini-ITX"]},
+        {"id": "atx-airflow", "name": "Endorfy Ventum 500 Air", "price": 329, "supportedFormFactors": ["ATX", "Micro-ATX", "Mini-ITX"]},
     ],
     "ram": [
         {"id": "ddr5-32", "name": "Kingston Fury 32 GB (2x16) DDR5-6000", "price": 519, "type": "DDR5", "modules": 2, "power": 10},
@@ -37,6 +41,7 @@ CATALOG = {
 CATEGORY_LABELS = {
     "cpu": "procesor",
     "motherboard": "płyta główna",
+    "case": "obudowa",
     "ram": "pamięć RAM",
     "gpu": "karta graficzna",
     "psu": "zasilacz",
@@ -46,7 +51,8 @@ CATEGORY_LABELS = {
 def selected_parts(selection: dict[str, str]) -> dict[str, dict]:
     parts = {}
     for category, product_id in selection.items():
-        product = next((item for item in CATALOG.get(category, []) if item["id"] == product_id), None)
+        catalog = CATALOG.get(category, [])
+        product = next((item for item in catalog if item["id"] == product_id), None)
         if product:
             parts[category] = product
     return parts
@@ -70,11 +76,15 @@ def analyze(selection: dict[str, str], budget: int | None = None) -> dict:
             issue("blocking", f"Nie rozpoznano kategorii komponentu: {category}.")
 
     cpu, board, ram = parts.get("cpu"), parts.get("motherboard"), parts.get("ram")
-    gpu, psu = parts.get("gpu"), parts.get("psu")
+    gpu, psu, case = parts.get("gpu"), parts.get("psu"), parts.get("case")
     if cpu and board and cpu["socket"] != board["socket"]:
         issue("blocking", f"Procesor wymaga socketu {cpu['socket']}, a płyta ma {board['socket']}.")
     if board and ram and board["ram"] != ram["type"]:
         issue("blocking", f"Płyta obsługuje {board['ram']}, a wybrana pamięć to {ram['type']}.")
+    if board and case:
+        board_form_factor = board["formFactor"]
+        if board_form_factor not in case["supportedFormFactors"]:
+            issue("blocking", f"Obudowa nie mieści płyty głównej w formacie {board_form_factor}.")
     if ram and ram["modules"] == 1:
         issue("warning", "Jeden moduł RAM ogranicza pracę w dwóch kanałach pamięci.")
     if gpu and psu and psu["pcie"] < gpu["connectors"]:
