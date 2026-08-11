@@ -1,11 +1,12 @@
-const labels = { cpu: "Procesor", motherboard: "Płyta główna", case: "Obudowa", cooler: "Chłodzenie", ram: "Pamięć RAM", gpu: "Karta graficzna", psu: "Zasilacz" };
+const labels = { cpu: "Procesor", motherboard: "Płyta główna", case: "Obudowa", cooler: "Chłodzenie", disk: "Dysk", ram: "Pamięć RAM", gpu: "Karta graficzna", psu: "Zasilacz" };
+const categoryFields = Object.entries(labels);
 let catalog = {};
 let analysisVersion = 0;
 
 function money(value) { return `${value.toLocaleString("pl-PL")} zł`; }
 
 function selection() {
-  return Object.fromEntries(Object.entries(labels).map(([category]) => [
+  return Object.fromEntries(categoryFields.map(([category]) => [
     category,
     document.querySelector(`[name="${category}"]`).value,
   ]));
@@ -13,7 +14,7 @@ function selection() {
 
 function renderCatalog() {
   const fields = document.querySelector("#component-fields");
-  fields.innerHTML = Object.entries(labels).map(([category, label]) => `
+  fields.innerHTML = categoryFields.map(([category, label]) => `
     <label>${label}<select name="${category}">${catalog[category].map((part, index) =>
       `<option value="${part.id}" ${index === 0 ? "selected" : ""}>${part.name} | ${money(part.price)}</option>`).join("")}</select></label>`).join("");
 }

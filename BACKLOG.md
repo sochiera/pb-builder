@@ -16,7 +16,7 @@ Jako osoba składająca komputer chcę dobrać chłodzenie i zobaczyć, czy moż
 - Sprawdzenie: uruchom demo, wybierz kolejno chłodzenie obsługujące i nieobsługujące podstawkę procesora, a następnie potwierdź, że ocena zestawu zmienia się i wyjaśnia przyczynę.
 - Poza zakresem: wydajność i głośność chłodzenia, jego wymiary oraz kolizje z obudową, pamięcią i kartą graficzną.
 
-## US-003 — Składający sprawdza możliwość podłączenia dysku  [nowa]
+## US-003 — Składający sprawdza możliwość podłączenia dysku  [w toku]
 
 Jako osoba składająca komputer chcę dobrać dysk i zobaczyć, czy można go podłączyć do wybranej płyty głównej, żeby uniknąć zakupu niepasujących części.
 

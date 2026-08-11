@@ -17,8 +17,8 @@ CATALOG = {
         {"id": "r7-7800x3d", "name": "AMD Ryzen 7 7800X3D", "price": 1599, "socket": "AM5", "power": 120, "tier": 5},
     ],
     "motherboard": [
-        {"id": "b650m", "name": "MSI B650M Gaming Plus WiFi", "price": 639, "socket": "AM5", "ram": "DDR5", "formFactor": "Micro-ATX", "power": 45},
-        {"id": "b550", "name": "ASUS TUF Gaming B550-Plus", "price": 589, "socket": "AM4", "ram": "DDR4", "formFactor": "ATX", "power": 40},
+        {"id": "b650m", "name": "MSI B650M Gaming Plus WiFi", "price": 639, "socket": "AM5", "ram": "DDR5", "formFactor": "Micro-ATX", "supportedStorageInterfaces": ["NVMe"], "power": 45},
+        {"id": "b550", "name": "ASUS TUF Gaming B550-Plus", "price": 589, "socket": "AM4", "ram": "DDR4", "formFactor": "ATX", "supportedStorageInterfaces": ["NVMe", "SATA"], "power": 40},
     ],
     "case": [
         {"id": "m-atx-compact", "name": "Cooler Master Q300L V2", "price": 249, "supportedFormFactors": ["Micro-ATX", "Mini-ITX"]},
@@ -27,6 +27,10 @@ CATALOG = {
     "cooler": [
         {"id": "fortis-5", "name": "Endorfy Fortis 5", "price": 219, "supportedSockets": ["AM4", "AM5"]},
         {"id": "alpine-23", "name": "Arctic Alpine 23", "price": 119, "supportedSockets": ["AM4"]},
+    ],
+    "disk": [
+        {"id": "nvme-1tb", "name": "Kingston NV3 1 TB", "price": 299, "interface": "NVMe"},
+        {"id": "sata-1tb", "name": "Crucial MX500 1 TB", "price": 329, "interface": "SATA"},
     ],
     "ram": [
         {"id": "ddr5-32", "name": "Kingston Fury 32 GB (2x16) DDR5-6000", "price": 519, "type": "DDR5", "modules": 2, "power": 10},
@@ -47,6 +51,7 @@ CATEGORY_LABELS = {
     "motherboard": "płyta główna",
     "case": "obudowa",
     "cooler": "chłodzenie",
+    "disk": "dysk",
     "ram": "pamięć RAM",
     "gpu": "karta graficzna",
     "psu": "zasilacz",
@@ -58,12 +63,11 @@ def find_product(category: str, product_id: str) -> dict | None:
 
 
 def selected_parts(selection: dict[str, str]) -> dict[str, dict]:
-    parts = {}
-    for category, product_id in selection.items():
-        product = find_product(category, product_id)
-        if product:
-            parts[category] = product
-    return parts
+    return {
+        category: product
+        for category, product_id in selection.items()
+        if (product := find_product(category, product_id)) is not None
+    }
 
 
 def analyze(selection: dict[str, str], budget: int | None = None) -> dict:
@@ -86,6 +90,7 @@ def analyze(selection: dict[str, str], budget: int | None = None) -> dict:
     cpu, board, ram = parts.get("cpu"), parts.get("motherboard"), parts.get("ram")
     gpu, psu, case = parts.get("gpu"), parts.get("psu"), parts.get("case")
     cooler = parts.get("cooler")
+    disk = parts.get("disk")
     if cpu and board and cpu["socket"] != board["socket"]:
         issue("blocking", f"Procesor wymaga socketu {cpu['socket']}, a płyta ma {board['socket']}.")
     if board and ram and board["ram"] != ram["type"]:
@@ -103,6 +108,12 @@ def analyze(selection: dict[str, str], budget: int | None = None) -> dict:
             issue("info", f"Chłodzenie {cooler['name']} obsługuje podstawkę {socket} procesora.")
         else:
             issue("blocking", f"Chłodzenie nie obsługuje podstawki {socket} procesora.")
+    if board and disk:
+        storage_interface = disk["interface"]
+        if storage_interface in board["supportedStorageInterfaces"]:
+            issue("info", f"Płyta główna obsługuje dysk z interfejsem {storage_interface}.")
+        else:
+            issue("blocking", f"Płyta główna nie obsługuje interfejsu {storage_interface} wybranego dysku.")
     if ram and ram["modules"] == 1:
         issue("warning", "Jeden moduł RAM ogranicza pracę w dwóch kanałach pamięci.")
     if gpu and psu and psu["pcie"] < gpu["connectors"]:

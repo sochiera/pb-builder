@@ -148,44 +148,104 @@ const publish = (attribute, value) => {
     await waitFor(() =>
       document.querySelector('select[name="case"]') &&
       document.querySelector('select[name="cooler"]') &&
+      document.querySelector('select[name="disk"]') &&
       visible("#total") !== "-"
     );
     const caseField = document.querySelector('select[name="case"]');
     const coolerField = document.querySelector('select[name="cooler"]');
+    const diskField = document.querySelector('select[name="disk"]');
     const budgetField = document.querySelector("#budget");
+    const issues = () => Array.from(document.querySelectorAll("#issues li"), (item) => ({
+      level: item.className,
+      text: item.textContent.replace(/\\s/g, " ").trim(),
+    }));
     window.__testRequests.length = 0;
+
+    stage = "compatible disk request";
+    diskField.value = "nvme-1tb";
+    diskField.dispatchEvent(new Event("input", { bubbles: true }));
+    const compatibleDiskRequest = await waitFor(() => window.__testRequests.find((request) =>
+      request.selection &&
+      request.selection.disk === "nvme-1tb" &&
+      request.budget === 5500
+    ));
+    await waitFor(() => visible("#status") === "Zestaw jest kompatybilny" &&
+      issues().some((issue) =>
+        issue.level === "info" &&
+        issue.text.includes("NVMe") &&
+        issue.text.toLowerCase().includes("dysk")
+      )
+    );
+    const compatibleStatus = visible("#status");
+    const compatibleIssues = issues();
 
     stage = "cooler request";
     coolerField.value = "fortis-5";
     coolerField.dispatchEvent(new Event("input", { bubbles: true }));
     await waitFor(() => window.__testRequests.find((request) =>
-      request.selection && request.selection.cooler === "fortis-5" && request.budget === 5500
+      request.selection &&
+      request.selection.cooler === "fortis-5" &&
+      request.selection.disk === "nvme-1tb" &&
+      request.budget === 5500
     ));
 
     stage = "case request";
     caseField.value = "atx-airflow";
     caseField.dispatchEvent(new Event("input", { bubbles: true }));
     const caseRequest = await waitFor(() => window.__testRequests.find((request) =>
-      request.selection && request.selection.case === "atx-airflow" && request.budget === 5500
+      request.selection &&
+      request.selection.case === "atx-airflow" &&
+      request.selection.disk === "nvme-1tb" &&
+      request.budget === 5500
     ));
 
     stage = "budget request";
     budgetField.value = "5000";
     budgetField.dispatchEvent(new Event("input", { bubbles: true }));
     const budgetRequest = await waitFor(() => window.__testRequests.find((request) =>
-      request.selection && request.selection.case === "atx-airflow" && request.budget === 5000
+      request.selection &&
+      request.selection.case === "atx-airflow" &&
+      request.selection.disk === "nvme-1tb" &&
+      request.budget === 5000
     ));
     stage = "visible totals";
-    await waitFor(() => compact("#total") === "5903 zł" && compact("#remaining") === "-903 zł");
+    await waitFor(() => compact("#total") === "6202 zł" && compact("#remaining") === "-1202 zł");
+    const compatibleTotal = visible("#total");
+    const compatibleRemaining = visible("#remaining");
+
+    stage = "incompatible disk request";
+    diskField.value = "sata-1tb";
+    diskField.dispatchEvent(new Event("input", { bubbles: true }));
+    const incompatibleDiskRequest = await waitFor(() => window.__testRequests.find((request) =>
+      request.selection &&
+      request.selection.disk === "sata-1tb" &&
+      request.budget === 5000
+    ));
+    await waitFor(() => visible("#status") === "Zestaw wymaga zmian" &&
+      issues().some((issue) =>
+        issue.level === "blocking" &&
+        issue.text.includes("SATA") &&
+        issue.text.toLowerCase().includes("nie obsługuje")
+      )
+    );
 
     publish("data-browser-test", {
       caseOptions: Array.from(caseField.options, (option) => option.value),
       coolerOptions: Array.from(coolerField.options, (option) => option.value),
+      diskOptions: Array.from(diskField.options, (option) => option.value),
+      diskLabels: Array.from(diskField.options, (option) => option.textContent),
+      compatibleDiskRequest,
+      incompatibleDiskRequest,
       caseRequest,
       budgetRequest,
+      compatibleStatus,
+      compatibleIssues,
+      compatibleTotal,
+      compatibleRemaining,
       total: visible("#total"),
       remaining: visible("#remaining"),
       status: document.querySelector("#status").textContent,
+      issues: issues(),
       mobileLayout: window.matchMedia("(max-width: 760px)").matches,
     });
   } catch (error) {
@@ -238,6 +298,7 @@ const issues = () => Array.from(document.querySelectorAll("#issues li"), (item) 
     await waitFor(() =>
       document.querySelector('select[name="cpu"]') &&
       document.querySelector('select[name="cooler"]') &&
+      document.querySelector('select[name="disk"]') &&
       visible("#total") !== "-"
     );
     const cpuField = document.querySelector('select[name="cpu"]');
@@ -255,7 +316,9 @@ const issues = () => Array.from(document.querySelectorAll("#issues li"), (item) 
     stage = "cooler change";
     await waitFor(() => coolerField.value === "alpine-23");
     await waitFor(() => window.__testRequests.find((request) =>
-      request.selection && request.selection.cooler === "alpine-23"
+      request.selection &&
+      request.selection.cooler === "alpine-23" &&
+      request.selection.disk === "nvme-1tb"
     ));
     await waitFor(() => visible("#status") === "Zestaw wymaga zmian" &&
       issues().some((issue) =>
@@ -269,7 +332,9 @@ const issues = () => Array.from(document.querySelectorAll("#issues li"), (item) 
     document.documentElement.setAttribute("data-keyboard-ready", "restore");
     await waitFor(() => coolerField.value === "fortis-5");
     await waitFor(() => window.__testRequests.find((request) =>
-      request.selection && request.selection.cooler === "fortis-5"
+      request.selection &&
+      request.selection.cooler === "fortis-5" &&
+      request.selection.disk === "nvme-1tb"
     ));
 
     stage = "cpu change";
@@ -278,7 +343,8 @@ const issues = () => Array.from(document.querySelectorAll("#issues li"), (item) 
     await waitFor(() => window.__testRequests.find((request) =>
       request.selection &&
       request.selection.cpu === "r7-7800x3d" &&
-      request.selection.cooler === "fortis-5"
+      request.selection.cooler === "fortis-5" &&
+      request.selection.disk === "nvme-1tb"
     ));
 
     stage = "restore compatible profile";
@@ -287,7 +353,8 @@ const issues = () => Array.from(document.querySelectorAll("#issues li"), (item) 
     await waitFor(() => window.__testRequests.find((request) =>
       request.selection &&
       request.selection.cpu === "r5-7600" &&
-      request.selection.cooler === "fortis-5"
+      request.selection.cooler === "fortis-5" &&
+      request.selection.disk === "nvme-1tb"
     ));
     await waitFor(() => visible("#status") === "Zestaw jest kompatybilny");
 
@@ -448,6 +515,36 @@ class AnalysisTest(unittest.TestCase):
                     for issue in report["issues"]
                 ))
 
+    def test_blocks_configuration_without_or_with_unknown_disk(self):
+        base_selection = {
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "m-atx-compact",
+            "cooler": "fortis-5",
+        }
+
+        for label, disk in (
+            ("missing", None),
+            ("unknown", "unknown-disk"),
+            ("unsupported", "r5-7600"),
+        ):
+            with self.subTest(disk=label):
+                selection = dict(base_selection)
+                if disk is not None:
+                    selection["disk"] = disk
+
+                report = analyze(selection)
+
+                self.assertFalse(report["isCompatible"])
+                self.assertTrue(any(
+                    issue["level"] == "blocking"
+                    and "dysk" in issue["message"].lower()
+                    for issue in report["issues"]
+                ))
+
     def test_accepts_case_that_supports_motherboard_form_factor(self):
         report = analyze({
             "cpu": "r5-7600",
@@ -457,6 +554,7 @@ class AnalysisTest(unittest.TestCase):
             "psu": "650w",
             "case": "m-atx-compact",
             "cooler": "fortis-5",
+            "disk": "nvme-1tb",
         })
 
         self.assertTrue(report["isCompatible"])
@@ -488,6 +586,65 @@ class AnalysisTest(unittest.TestCase):
             and "chłodzenie" in issue["message"].lower()
             and "AM5" in issue["message"]
             and "podstawk" in issue["message"].lower()
+            for issue in report["issues"]
+        ))
+
+    def test_accepts_disk_that_supports_motherboard_interface(self):
+        report = analyze({
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "m-atx-compact",
+            "cooler": "fortis-5",
+            "disk": "nvme-1tb",
+        })
+
+        self.assertTrue(report["isCompatible"])
+        self.assertFalse(any(
+            issue["level"] == "blocking"
+            and "dysk" in issue["message"].lower()
+            for issue in report["issues"]
+        ))
+
+    def test_accepts_sata_disk_on_b550(self):
+        report = analyze({
+            "motherboard": "b550",
+            "disk": "sata-1tb",
+        })
+
+        self.assertTrue(any(
+            issue["level"] == "info"
+            and "SATA" in issue["message"]
+            and "dysk" in issue["message"].lower()
+            for issue in report["issues"]
+        ))
+        self.assertFalse(any(
+            issue["level"] == "blocking"
+            and "dysk" in issue["message"].lower()
+            for issue in report["issues"]
+        ))
+
+    def test_rejects_disk_that_does_not_support_motherboard_interface(self):
+        report = analyze({
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "m-atx-compact",
+            "cooler": "fortis-5",
+            "disk": "sata-1tb",
+        })
+
+        self.assertFalse(report["isCompatible"])
+        self.assertTrue(any(
+            issue["level"] == "blocking"
+            and "dysk" in issue["message"].lower()
+            and "interfejsu" in issue["message"].lower()
+            and "SATA" in issue["message"]
+            and "nie obsługuje" in issue["message"].lower()
             for issue in report["issues"]
         ))
 
@@ -535,6 +692,21 @@ class AnalysisTest(unittest.TestCase):
 
         self.assertEqual(report["total"], 4623)
         self.assertEqual(report["remainingBudget"], 377)
+
+    def test_includes_disk_price_in_total_and_budget(self):
+        report = analyze({
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "m-atx-compact",
+            "cooler": "fortis-5",
+            "disk": "nvme-1tb",
+        }, 5000)
+
+        self.assertEqual(report["total"], 4922)
+        self.assertEqual(report["remainingBudget"], 78)
 
 
 class MakefileTest(unittest.TestCase):
@@ -739,7 +911,18 @@ class ServerTest(unittest.TestCase):
 
         self.assertIn("atx-airflow", browser_report["caseOptions"])
         self.assertIn("fortis-5", browser_report["coolerOptions"])
+        self.assertIn("nvme-1tb", browser_report["diskOptions"])
+        self.assertIn("sata-1tb", browser_report["diskOptions"])
+        self.assertTrue(any("299" in label for label in browser_report["diskLabels"]))
         self.assertTrue(browser_report["mobileLayout"])
+        self.assertEqual(
+            browser_report["compatibleDiskRequest"]["selection"]["disk"],
+            "nvme-1tb",
+        )
+        self.assertEqual(
+            browser_report["incompatibleDiskRequest"]["selection"]["disk"],
+            "sata-1tb",
+        )
         self.assertEqual(browser_report["caseRequest"]["budget"], 5500)
         self.assertEqual(browser_report["budgetRequest"]["budget"], 5000)
         self.assertEqual(
@@ -752,13 +935,32 @@ class ServerTest(unittest.TestCase):
                 "ram": "ddr5-32",
                 "gpu": "rtx-5070",
                 "psu": "650w",
+                "disk": "nvme-1tb",
             },
         )
-        for actual, expected in ((browser_report["total"], "5903"), (browser_report["remaining"], "-903")):
+        self.assertEqual(browser_report["compatibleStatus"], "Zestaw jest kompatybilny")
+        self.assertTrue(any(
+            issue["level"] == "info"
+            and "NVMe" in issue["text"]
+            and "dysk" in issue["text"].lower()
+            for issue in browser_report["compatibleIssues"]
+        ))
+        for actual, expected in (
+            (browser_report["compatibleTotal"], "6202"),
+            (browser_report["compatibleRemaining"], "-1202"),
+            (browser_report["total"], "6232"),
+            (browser_report["remaining"], "-1232"),
+        ):
             parts = actual.split()
             self.assertEqual(parts[-1], "zł")
             self.assertEqual("".join(parts[:-1]), expected)
-        self.assertEqual(browser_report["status"], "Zestaw jest kompatybilny")
+        self.assertEqual(browser_report["status"], "Zestaw wymaga zmian")
+        self.assertTrue(any(
+            issue["level"] == "blocking"
+            and "SATA" in issue["text"]
+            and "nie obsługuje" in issue["text"].lower()
+            for issue in browser_report["issues"]
+        ))
 
     def test_cooler_selection_refreshes_analysis_and_explains_socket_in_browser(self):
         result = self.run_browser_page(
@@ -835,6 +1037,33 @@ class ServerTest(unittest.TestCase):
             for item in catalog["cooler"]
         ))
 
+    def test_catalog_exposes_disks_and_supported_storage_interface_facts(self):
+        with urlopen(f"{self.base_url}/api/catalog") as response:
+            catalog = json.loads(response.read().decode())
+
+        self.assertIn("disk", catalog)
+        self.assertTrue(catalog["disk"])
+        self.assertTrue(all(
+            isinstance(item.get("interface"), str) and item["interface"]
+            for item in catalog["disk"]
+        ))
+        self.assertTrue(catalog["motherboard"])
+        self.assertTrue(all(
+            isinstance(item.get("supportedStorageInterfaces"), list)
+            and item["supportedStorageInterfaces"]
+            for item in catalog["motherboard"]
+        ))
+        self.assertTrue(any(
+            item["id"] == "nvme-1tb" and item["interface"] == "NVMe"
+            for item in catalog["disk"]
+        ))
+        self.assertTrue(any(
+            item["id"] == "b650m"
+            and isinstance(item.get("supportedStorageInterfaces"), list)
+            and "NVMe" in item["supportedStorageInterfaces"]
+            for item in catalog["motherboard"]
+        ))
+
     def test_accepts_cooler_that_supports_cpu_socket(self):
         with urlopen(f"{self.base_url}/api/catalog") as response:
             catalog = json.loads(response.read().decode())
@@ -853,6 +1082,7 @@ class ServerTest(unittest.TestCase):
             "psu": "650w",
             "case": "m-atx-compact",
             "cooler": am5_coolers[0]["id"],
+            "disk": "nvme-1tb",
         })
 
         self.assertTrue(report["isCompatible"])
