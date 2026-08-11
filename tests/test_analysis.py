@@ -70,10 +70,22 @@ const publish = (attribute, value) => {
 
 (async () => {
   try {
-    await waitFor(() => document.querySelector('select[name="case"]') && visible("#total") !== "-");
+    await waitFor(() =>
+      document.querySelector('select[name="case"]') &&
+      document.querySelector('select[name="cooler"]') &&
+      visible("#total") !== "-"
+    );
     const caseField = document.querySelector('select[name="case"]');
+    const coolerField = document.querySelector('select[name="cooler"]');
     const budgetField = document.querySelector("#budget");
     window.__testRequests.length = 0;
+
+    stage = "cooler request";
+    coolerField.value = "fortis-5";
+    coolerField.dispatchEvent(new Event("input", { bubbles: true }));
+    await waitFor(() => window.__testRequests.find((request) =>
+      request.selection && request.selection.cooler === "fortis-5" && request.budget === 5500
+    ));
 
     stage = "case request";
     caseField.value = "atx-airflow";
@@ -89,10 +101,11 @@ const publish = (attribute, value) => {
       request.selection && request.selection.case === "atx-airflow" && request.budget === 5000
     ));
     stage = "visible totals";
-    await waitFor(() => compact("#total") === "5684 zł" && compact("#remaining") === "-684 zł");
+    await waitFor(() => compact("#total") === "5903 zł" && compact("#remaining") === "-903 zł");
 
     publish("data-browser-test", {
       caseOptions: Array.from(caseField.options, (option) => option.value),
+      coolerOptions: Array.from(coolerField.options, (option) => option.value),
       caseRequest,
       budgetRequest,
       total: visible("#total"),
@@ -222,6 +235,31 @@ class AnalysisTest(unittest.TestCase):
         ))
         self.assertFalse(report["isCompatible"])
 
+    def test_blocks_configuration_without_or_with_unknown_cooler(self):
+        base_selection = {
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "m-atx-compact",
+        }
+
+        for label, cooler in (("missing", None), ("unknown", "unknown-cooler")):
+            with self.subTest(cooler=label):
+                selection = dict(base_selection)
+                if cooler is not None:
+                    selection["cooler"] = cooler
+
+                report = analyze(selection)
+
+                self.assertFalse(report["isCompatible"])
+                self.assertTrue(any(
+                    issue["level"] == "blocking"
+                    and "chłodzenie" in issue["message"].lower()
+                    for issue in report["issues"]
+                ))
+
     def test_accepts_case_that_supports_motherboard_form_factor(self):
         report = analyze({
             "cpu": "r5-7600",
@@ -230,6 +268,7 @@ class AnalysisTest(unittest.TestCase):
             "gpu": "rtx-5060",
             "psu": "650w",
             "case": "m-atx-compact",
+            "cooler": "fortis-5",
         })
 
         self.assertTrue(report["isCompatible"])
@@ -241,6 +280,26 @@ class AnalysisTest(unittest.TestCase):
             issue["level"] == "info"
             and "Micro-ATX" in issue["message"]
             and "obudowa" in issue["message"].lower()
+            for issue in report["issues"]
+        ))
+
+    def test_rejects_cooler_that_does_not_support_cpu_socket(self):
+        report = analyze({
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "m-atx-compact",
+            "cooler": "alpine-23",
+        })
+
+        self.assertFalse(report["isCompatible"])
+        self.assertTrue(any(
+            issue["level"] == "blocking"
+            and "chłodzenie" in issue["message"].lower()
+            and "AM5" in issue["message"]
+            and "podstawk" in issue["message"].lower()
             for issue in report["issues"]
         ))
 
@@ -274,6 +333,20 @@ class AnalysisTest(unittest.TestCase):
 
         self.assertEqual(report["total"], 4404)
         self.assertEqual(report["remainingBudget"], 596)
+
+    def test_includes_cooler_price_in_total_and_budget(self):
+        report = analyze({
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "m-atx-compact",
+            "cooler": "fortis-5",
+        }, 5000)
+
+        self.assertEqual(report["total"], 4623)
+        self.assertEqual(report["remainingBudget"], 377)
 
 
 class MakefileTest(unittest.TestCase):
@@ -365,6 +438,7 @@ class ServerTest(unittest.TestCase):
         browser_report = json.loads(base64.b64decode(result_match.group(1)).decode())
 
         self.assertIn("atx-airflow", browser_report["caseOptions"])
+        self.assertIn("fortis-5", browser_report["coolerOptions"])
         self.assertTrue(browser_report["mobileLayout"])
         self.assertEqual(browser_report["caseRequest"]["budget"], 5500)
         self.assertEqual(browser_report["budgetRequest"]["budget"], 5000)
@@ -374,12 +448,13 @@ class ServerTest(unittest.TestCase):
                 "cpu": "r5-7600",
                 "motherboard": "b650m",
                 "case": "atx-airflow",
+                "cooler": "fortis-5",
                 "ram": "ddr5-32",
                 "gpu": "rtx-5070",
                 "psu": "650w",
             },
         )
-        for actual, expected in ((browser_report["total"], "5684"), (browser_report["remaining"], "-684")):
+        for actual, expected in ((browser_report["total"], "5903"), (browser_report["remaining"], "-903")):
             parts = actual.split()
             self.assertEqual(parts[-1], "zł")
             self.assertEqual("".join(parts[:-1]), expected)
@@ -412,6 +487,49 @@ class ServerTest(unittest.TestCase):
         self.assertTrue(any(
             item["id"] == "m-atx-compact" and "Micro-ATX" in item.get("supportedFormFactors", [])
             for item in catalog["case"]
+        ))
+
+    def test_catalog_exposes_coolers_and_supported_socket_facts(self):
+        with urlopen(f"{self.base_url}/api/catalog") as response:
+            catalog = json.loads(response.read().decode())
+
+        self.assertIn("cooler", catalog)
+        self.assertTrue(catalog["cooler"])
+        self.assertTrue(all(
+            isinstance(item.get("supportedSockets"), list) and item["supportedSockets"]
+            for item in catalog["cooler"]
+        ))
+        self.assertTrue(any(
+            "AM5" in item["supportedSockets"]
+            for item in catalog["cooler"]
+        ))
+
+    def test_accepts_cooler_that_supports_cpu_socket(self):
+        with urlopen(f"{self.base_url}/api/catalog") as response:
+            catalog = json.loads(response.read().decode())
+
+        am5_coolers = [
+            item for item in catalog.get("cooler", [])
+            if "AM5" in item.get("supportedSockets", [])
+        ]
+        self.assertTrue(am5_coolers)
+
+        report = analyze({
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5060",
+            "psu": "650w",
+            "case": "m-atx-compact",
+            "cooler": am5_coolers[0]["id"],
+        })
+
+        self.assertTrue(report["isCompatible"])
+        self.assertFalse(any(
+            issue["level"] == "blocking"
+            and "chłod" in issue["message"].lower()
+            and "podstawk" in issue["message"].lower()
+            for issue in report["issues"]
         ))
 
 

@@ -4,6 +4,8 @@
 
 `POST /api/analyze` przyjmuje obiekt z identyfikatorami wybranych części oraz opcjonalnym całkowitym budżetem i zwraca koszt, zapotrzebowanie mocy i listę problemów. Nieprawidłowa struktura JSON otrzymuje 400. Brakujący, nieznany lub niewspierany identyfikator jest problemem blokującym, więc niepełne dane nigdy nie stają się zgodne przez pominięcie.
 
+Katalog API zawiera również kategorię `cooler`; jej produkty publikują listę `supportedSockets`. Chłodzenie jest wymagane, a analiza blokuje zestaw, gdy nie obsługuje podstawki wybranego procesora.
+
 Rekomendowana moc zawiera 35% zapasu i jest zawsze zaokrąglana w górę do wielokrotności 50 W. Klient numeruje żądania analizy i renderuje tylko najnowszą odpowiedź, dlatego opóźniona odpowiedź nie może zastąpić aktualnego wyniku.
 
 `create_server` publikuje wyłącznie wydzielony katalog `client/`, niezależnie od bieżącego katalogu procesu. Kod serwera, testy i dokumentacja nie są zasobami HTTP. Reguły pozostają testowalne poza HTTP. Katalog jest celowo lokalny: nie udaje kompletnej integracji źródła handlowego.

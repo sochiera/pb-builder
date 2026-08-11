@@ -8,7 +8,7 @@ Jako osoba składająca komputer chcę dobrać obudowę i zobaczyć, czy mieści
 - Sprawdzenie: uruchom demo, wybierz kolejno obudowę zgodną i niezgodną z formatem płyty, a następnie potwierdź, że ocena zestawu zmienia się i wyjaśnia przyczynę.
 - Poza zakresem: dopasowanie długości karty graficznej, chłodzenia i dysków.
 
-## US-002 — Składający sprawdza dopasowanie chłodzenia do procesora  [nowa]
+## US-002 — Składający sprawdza dopasowanie chłodzenia do procesora  [w toku]
 
 Jako osoba składająca komputer chcę dobrać chłodzenie i zobaczyć, czy można je zamontować na podstawce wybranego procesora, żeby uniknąć zakupu niepasujących części.
 

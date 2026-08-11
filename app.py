@@ -24,6 +24,10 @@ CATALOG = {
         {"id": "m-atx-compact", "name": "Cooler Master Q300L V2", "price": 249, "supportedFormFactors": ["Micro-ATX", "Mini-ITX"]},
         {"id": "atx-airflow", "name": "Endorfy Ventum 500 Air", "price": 329, "supportedFormFactors": ["ATX", "Micro-ATX", "Mini-ITX"]},
     ],
+    "cooler": [
+        {"id": "fortis-5", "name": "Endorfy Fortis 5", "price": 219, "supportedSockets": ["AM4", "AM5"]},
+        {"id": "alpine-23", "name": "Arctic Alpine 23", "price": 119, "supportedSockets": ["AM4"]},
+    ],
     "ram": [
         {"id": "ddr5-32", "name": "Kingston Fury 32 GB (2x16) DDR5-6000", "price": 519, "type": "DDR5", "modules": 2, "power": 10},
         {"id": "ddr4-32", "name": "Corsair Vengeance 32 GB (2x16) DDR4-3600", "price": 299, "type": "DDR4", "modules": 2, "power": 10},
@@ -42,17 +46,21 @@ CATEGORY_LABELS = {
     "cpu": "procesor",
     "motherboard": "płyta główna",
     "case": "obudowa",
+    "cooler": "chłodzenie",
     "ram": "pamięć RAM",
     "gpu": "karta graficzna",
     "psu": "zasilacz",
 }
 
 
+def find_product(category: str, product_id: str) -> dict | None:
+    return next((item for item in CATALOG.get(category, []) if item["id"] == product_id), None)
+
+
 def selected_parts(selection: dict[str, str]) -> dict[str, dict]:
     parts = {}
     for category, product_id in selection.items():
-        catalog = CATALOG.get(category, [])
-        product = next((item for item in catalog if item["id"] == product_id), None)
+        product = find_product(category, product_id)
         if product:
             parts[category] = product
     return parts
@@ -77,6 +85,7 @@ def analyze(selection: dict[str, str], budget: int | None = None) -> dict:
 
     cpu, board, ram = parts.get("cpu"), parts.get("motherboard"), parts.get("ram")
     gpu, psu, case = parts.get("gpu"), parts.get("psu"), parts.get("case")
+    cooler = parts.get("cooler")
     if cpu and board and cpu["socket"] != board["socket"]:
         issue("blocking", f"Procesor wymaga socketu {cpu['socket']}, a płyta ma {board['socket']}.")
     if board and ram and board["ram"] != ram["type"]:
@@ -88,6 +97,8 @@ def analyze(selection: dict[str, str], budget: int | None = None) -> dict:
             issue("info", f"Obudowa obsługuje płytę główną w formacie {board_form_factor}.")
         else:
             issue("blocking", f"Obudowa nie mieści płyty głównej w formacie {board_form_factor}.")
+    if cpu and cooler and cpu["socket"] not in cooler["supportedSockets"]:
+        issue("blocking", f"Chłodzenie nie obsługuje podstawki {cpu['socket']} procesora.")
     if ram and ram["modules"] == 1:
         issue("warning", "Jeden moduł RAM ogranicza pracę w dwóch kanałach pamięci.")
     if gpu and psu and psu["pcie"] < gpu["connectors"]:

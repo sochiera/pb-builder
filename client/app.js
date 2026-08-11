@@ -1,11 +1,14 @@
-const labels = { cpu: "Procesor", motherboard: "Płyta główna", case: "Obudowa", ram: "Pamięć RAM", gpu: "Karta graficzna", psu: "Zasilacz" };
+const labels = { cpu: "Procesor", motherboard: "Płyta główna", case: "Obudowa", cooler: "Chłodzenie", ram: "Pamięć RAM", gpu: "Karta graficzna", psu: "Zasilacz" };
 let catalog = {};
 let analysisVersion = 0;
 
 function money(value) { return `${value.toLocaleString("pl-PL")} zł`; }
 
 function selection() {
-  return Object.fromEntries(Object.keys(labels).map((category) => [category, document.querySelector(`[name=${category}]`).value]));
+  return Object.fromEntries(Object.entries(labels).map(([category]) => [
+    category,
+    document.querySelector(`[name="${category}"]`).value,
+  ]));
 }
 
 function renderCatalog() {
