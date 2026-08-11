@@ -492,7 +492,11 @@ const setPersistenceField = (name, value) => {
       ...persistenceState(),
       analysisRequest,
       total: visible("#total"),
+      remaining: visible("#remaining"),
+      power: visible("#power"),
+      recommendedPower: visible("#recommended"),
       status: visible("#status"),
+      issues: issues(),
     });
   } catch (error) {
     publish("data-persistence-test-error", `${stage}: ${error.stack || error}`);
@@ -1255,7 +1259,7 @@ class ServerTest(unittest.TestCase):
             for issue in browser_report["issues"]
         ))
 
-    def test_selection_and_budget_survive_reopen_and_restore_latest_state(self):
+    def test_reopen_restores_configuration_and_current_analysis(self):
         results = self.run_browser_persistence_pages()
         states = {
             phase: self.read_persistence_state(result, phase)
@@ -1335,6 +1339,73 @@ class ServerTest(unittest.TestCase):
                     },
                     expected,
                     "reopening the browser must analyze the restored selection and budget",
+                )
+
+        expected_reports = {
+            "restore-initial": {
+                "total": "5 282 zł",
+                "remaining": "-482 zł",
+                "power": "315 W",
+                "recommendedPower": "450 W",
+                "status": "Zestaw wymaga zmian",
+                "issues": (
+                    ("blocking", ("Procesor", "socketu AM5", "AM4")),
+                    ("info", ("Obudowa", "ATX")),
+                    ("blocking", ("Chłodzenie", "podstawki AM5")),
+                    ("info", ("Płyta główna", "SATA")),
+                    ("info", ("Zasilacz", "450 W")),
+                    ("warning", ("budżet", "482 zł")),
+                ),
+            },
+            "restore-latest": {
+                "total": "6 122 zł",
+                "remaining": "878 zł",
+                "power": "393 W",
+                "recommendedPower": "550 W",
+                "status": "Zestaw jest kompatybilny",
+                "issues": (
+                    ("info", ("Obudowa", "Micro-ATX")),
+                    ("info", ("Chłodzenie", "podstawkę AM5", "procesora")),
+                    ("info", ("Płyta główna", "NVMe")),
+                    ("info", ("Zasilacz", "550 W")),
+                    ("warning", ("Karta graficzna", "procesora", "CPU")),
+                ),
+            },
+        }
+        for phase, expected_report in expected_reports.items():
+            with self.subTest(report=phase):
+                state = states[phase]
+                for field in ("total", "remaining", "power", "recommendedPower", "status"):
+                    self.assertEqual(
+                        "".join(state[field].split()),
+                        "".join(expected_report[field].split()),
+                    )
+                actual_issues = [
+                    (issue["level"], issue["text"])
+                    for issue in state["issues"]
+                ]
+                self.assertCountEqual(
+                    [level for level, _ in actual_issues],
+                    [level for level, _ in expected_report["issues"]],
+                    f"{phase} report must contain exactly the current issue levels",
+                )
+                unmatched = list(actual_issues)
+                for level, fragments in expected_report["issues"]:
+                    matches = [
+                        index
+                        for index, (actual_level, text) in enumerate(unmatched)
+                        if actual_level == level and all(fragment in text for fragment in fragments)
+                    ]
+                    self.assertEqual(
+                        len(matches),
+                        1,
+                        f"{phase} report must explain {level} issue using {fragments!r}; "
+                        f"got {actual_issues!r}",
+                    )
+                    unmatched.pop(matches[0])
+                self.assertFalse(
+                    unmatched,
+                    f"{phase} report contains unexpected issues: {unmatched!r}",
                 )
 
     def test_rejects_json_with_invalid_structure(self):
