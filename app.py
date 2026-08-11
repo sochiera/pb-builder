@@ -83,7 +83,10 @@ def analyze(selection: dict[str, str], budget: int | None = None) -> dict:
         issue("blocking", f"Płyta obsługuje {board['ram']}, a wybrana pamięć to {ram['type']}.")
     if board and case:
         board_form_factor = board["formFactor"]
-        if board_form_factor not in case["supportedFormFactors"]:
+        supported_form_factors = case["supportedFormFactors"]
+        if board_form_factor in supported_form_factors:
+            issue("info", f"Obudowa obsługuje płytę główną w formacie {board_form_factor}.")
+        else:
             issue("blocking", f"Obudowa nie mieści płyty głównej w formacie {board_form_factor}.")
     if ram and ram["modules"] == 1:
         issue("warning", "Jeden moduł RAM ogranicza pracę w dwóch kanałach pamięci.")
