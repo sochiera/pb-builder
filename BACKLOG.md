@@ -15,3 +15,11 @@ Jako osoba składająca komputer chcę dobrać chłodzenie i zobaczyć, czy moż
 - Dlaczego teraz: raport testera task-001 r3 potwierdził zieloną pełną bramkę dopasowania obudowy, a PROJECT.md wymienia chłodzenie bezpośrednio po obudowie jako kolejny etap rozszerzania modelu.
 - Sprawdzenie: uruchom demo, wybierz kolejno chłodzenie obsługujące i nieobsługujące podstawkę procesora, a następnie potwierdź, że ocena zestawu zmienia się i wyjaśnia przyczynę.
 - Poza zakresem: wydajność i głośność chłodzenia, jego wymiary oraz kolizje z obudową, pamięcią i kartą graficzną.
+
+## US-003 — Składający sprawdza możliwość podłączenia dysku  [nowa]
+
+Jako osoba składająca komputer chcę dobrać dysk i zobaczyć, czy można go podłączyć do wybranej płyty głównej, żeby uniknąć zakupu niepasujących części.
+
+- Dlaczego teraz: raport testera task-004 r2 potwierdził działające dopasowanie chłodzenia, a PROJECT.md wymienia dyski bezpośrednio po chłodzeniu jako kolejny etap rozszerzania modelu.
+- Sprawdzenie: uruchom demo, wybierz kolejno dysk możliwy i niemożliwy do podłączenia do wybranej płyty, a następnie potwierdź, że ocena zestawu zmienia się i wyjaśnia przyczynę.
+- Poza zakresem: wydajność, pojemność i opłacalność dysku, liczba dostępnych złączy oraz kolizje współdzielonych linii.
