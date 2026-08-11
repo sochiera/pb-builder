@@ -107,12 +107,7 @@ window.fetch = (input, init = {}) => {
   }
   return nativeFetch(input, init);
 };
-</script>
-"""
 
-BROWSER_EXERCISE = """
-<script>
-let stage = "boot";
 const waitFor = (predicate) => new Promise((resolve, reject) => {
   const deadline = Date.now() + 5000;
   const poll = () => {
@@ -135,13 +130,23 @@ const waitFor = (predicate) => new Promise((resolve, reject) => {
 });
 
 const visible = (selector) => document.querySelector(selector).textContent.replace(/\\s/g, " ").trim();
-const compact = (selector) => visible(selector).replace(/\\s(?=\\d)/g, "");
+const issues = () => Array.from(document.querySelectorAll("#issues li"), (item) => ({
+  level: item.className,
+  text: item.textContent.replace(/\\s/g, " ").trim(),
+}));
 const publish = (attribute, value) => {
   document.documentElement.setAttribute(
     attribute,
     btoa(unescape(encodeURIComponent(JSON.stringify(value))))
   );
 };
+</script>
+"""
+
+BROWSER_EXERCISE = """
+<script>
+let stage = "boot";
+const compact = (selector) => visible(selector).replace(/\\s(?=\\d)/g, "");
 
 (async () => {
   try {
@@ -155,10 +160,6 @@ const publish = (attribute, value) => {
     const coolerField = document.querySelector('select[name="cooler"]');
     const diskField = document.querySelector('select[name="disk"]');
     const budgetField = document.querySelector("#budget");
-    const issues = () => Array.from(document.querySelectorAll("#issues li"), (item) => ({
-      level: item.className,
-      text: item.textContent.replace(/\\s/g, " ").trim(),
-    }));
     window.__testRequests.length = 0;
 
     stage = "compatible disk request";
@@ -260,38 +261,6 @@ const publish = (attribute, value) => {
 BROWSER_COOLER_EXERCISE = """
 <script>
 let stage = "boot";
-const waitFor = (predicate) => new Promise((resolve, reject) => {
-  const deadline = Date.now() + 5000;
-  const poll = () => {
-    let result;
-    try {
-      result = predicate();
-    } catch (error) {
-      reject(error);
-      return;
-    }
-    if (result) {
-      resolve(result);
-    } else if (Date.now() >= deadline) {
-      reject(new Error("Timed out waiting for browser state"));
-    } else {
-      setTimeout(poll, 25);
-    }
-  };
-  poll();
-});
-
-const visible = (selector) => document.querySelector(selector).textContent.replace(/\\s/g, " ").trim();
-const publish = (attribute, value) => {
-  document.documentElement.setAttribute(
-    attribute,
-    btoa(unescape(encodeURIComponent(JSON.stringify(value))))
-  );
-};
-const issues = () => Array.from(document.querySelectorAll("#issues li"), (item) => ({
-  level: item.className,
-  text: item.textContent.replace(/\\s/g, " ").trim(),
-}));
 
 (async () => {
   try {
@@ -372,12 +341,74 @@ const issues = () => Array.from(document.querySelectorAll("#issues li"), (item) 
 </script>
 """
 
+BROWSER_DISK_EXERCISE = """
+<script>
+let stage = "boot";
+
+(async () => {
+  try {
+    await waitFor(() =>
+      document.querySelector('select[name="disk"]') &&
+      visible("#status") === "Zestaw jest kompatybilny" &&
+      visible("#total") !== "-"
+    );
+    const diskField = document.querySelector('select[name="disk"]');
+    const workspace = document.querySelector(".workspace");
+    window.__testRequests.length = 0;
+    const compatibleIssues = issues();
+    const compatibleStatus = visible("#status");
+    const mobileDisplay = getComputedStyle(workspace).display;
+    const mobileColumns = getComputedStyle(workspace).gridTemplateColumns.trim().split(/\\s+/).length;
+
+    stage = "keyboard access";
+    diskField.focus();
+    const keyboardReady = diskField.tagName === "SELECT" &&
+      diskField.tabIndex >= 0 &&
+      document.activeElement === diskField;
+    if (!keyboardReady) throw new Error("disk select did not accept keyboard focus");
+    document.documentElement.setAttribute("data-keyboard-ready", "disk");
+
+    stage = "disk change";
+    await waitFor(() => diskField.value === "sata-1tb");
+    const incompatibleRequest = await waitFor(() => window.__testRequests.find((request) =>
+      request.selection &&
+      request.selection.disk === "sata-1tb"
+    ));
+    await waitFor(() => visible("#status") === "Zestaw wymaga zmian" &&
+      issues().some((issue) =>
+        issue.level === "blocking" &&
+        issue.text.includes("SATA") &&
+        issue.text.toLowerCase().includes("nie obsługuje")
+      )
+    );
+
+    publish("data-disk-browser-test", {
+      compatibleIssues,
+      compatibleStatus,
+      diskOptions: Array.from(diskField.options, (option) => option.value),
+      diskValue: diskField.value,
+      incompatibleRequest,
+      issues: issues(),
+      keyboardReady,
+      mobileDisplay,
+      mobileColumns,
+      mobileLayout: window.matchMedia("(max-width: 760px)").matches,
+      status: visible("#status"),
+    });
+  } catch (error) {
+    publish("data-disk-browser-test-error", `${stage}: ${error.stack || error}`);
+  }
+})();
+</script>
+"""
+
 
 class BrowserTestHandler(Handler):
     def do_GET(self):
         exercises = {
             "/__browser_test__": BROWSER_EXERCISE,
             "/__cooler_test__": BROWSER_COOLER_EXERCISE,
+            "/__disk_test__": BROWSER_DISK_EXERCISE,
         }
         exercise = exercises.get(self.path)
         if exercise is not None:
@@ -748,7 +779,7 @@ class ServerTest(unittest.TestCase):
             self.assertEqual(error.exception.code, 404)
             error.exception.close()
 
-    def run_browser_page(self, path, keyboard_steps=()):
+    def run_browser_page(self, path, keyboard_steps=(), result_attribute="data-cooler-browser-test"):
         browser = shutil.which("chromium-browser") or shutil.which("chromium")
         if browser is None:
             self.skipTest("headless Chromium is not installed")
@@ -856,21 +887,41 @@ class ServerTest(unittest.TestCase):
                         raise TimeoutError(f"Timed out waiting for {expression}")
 
                     key_codes = {"ArrowDown": 40, "ArrowUp": 38}
-                    for marker, key in keyboard_steps:
+                    for keyboard_step in keyboard_steps:
+                        marker, key, *target = keyboard_step
                         wait_for(f"document.documentElement.getAttribute('data-keyboard-ready') === {json.dumps(marker)}")
                         key_code = key_codes[key]
-                        for event_type in ("keyDown", "keyUp"):
-                            cdp_call("Input.dispatchKeyEvent", {
-                                "type": event_type,
-                                "key": key,
-                                "code": key,
-                                "windowsVirtualKeyCode": key_code,
-                                "nativeVirtualKeyCode": key_code,
-                            }, session_id)
+                        repetitions = 1
+                        if target:
+                            if len(target) != 1:
+                                raise ValueError("keyboard target must contain one option value")
+                            selector = json.dumps(f'select[name="{marker}"]')
+                            value = json.dumps(target[0])
+                            repetitions = evaluate(
+                                f"(() => {{"
+                                f"const field = document.querySelector({selector});"
+                                f"const options = Array.from(field.options);"
+                                f"const current = options.findIndex((option) => option.value === field.value);"
+                                f"const desired = options.findIndex((option) => option.value === {value});"
+                                f"if (current < 0 || desired < 0 || options.length === 0) return -1;"
+                                f"return (desired - current + options.length) % options.length || options.length;"
+                                f"}})()"
+                            )
+                            if repetitions < 1:
+                                raise ValueError(f"keyboard target {target[0]!r} is not reachable")
+                        for _ in range(repetitions):
+                            for event_type in ("keyDown", "keyUp"):
+                                cdp_call("Input.dispatchKeyEvent", {
+                                    "type": event_type,
+                                    "key": key,
+                                    "code": key,
+                                    "windowsVirtualKeyCode": key_code,
+                                    "nativeVirtualKeyCode": key_code,
+                                }, session_id)
 
                     wait_for(
-                        "document.documentElement.hasAttribute('data-cooler-browser-test') || "
-                        "document.documentElement.hasAttribute('data-cooler-browser-test-error')"
+                        f"document.documentElement.hasAttribute({json.dumps(result_attribute)}) || "
+                        f"document.documentElement.hasAttribute({json.dumps(result_attribute + '-error')})"
                     )
                     dom = evaluate("document.documentElement.outerHTML")
                     result = subprocess.CompletedProcess(command, 0, dom, "")
@@ -992,6 +1043,52 @@ class ServerTest(unittest.TestCase):
             and "podstawk" in issue["text"].lower()
             for issue in browser_report["issues"]
         ), "compatible cooler result must explain CPU socket support")
+
+    def test_disk_selection_works_with_keyboard_and_explains_interface_in_browser(self):
+        result = self.run_browser_page(
+            "/__disk_test__",
+            (("disk", "ArrowDown", "sata-1tb"),),
+            "data-disk-browser-test",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        error_match = re.search(r'data-disk-browser-test-error="([^"]+)"', result.stdout)
+        if error_match:
+            error = base64.b64decode(error_match.group(1)).decode()
+            self.fail(f"browser behavior test failed: {error}")
+
+        result_match = re.search(r'data-disk-browser-test="([^"]+)"', result.stdout)
+        self.assertIsNotNone(
+            result_match,
+            f"browser behavior test produced no result:\n{result.stderr}\n{result.stdout}",
+        )
+        browser_report = json.loads(base64.b64decode(result_match.group(1)).decode())
+
+        self.assertIn("nvme-1tb", browser_report["diskOptions"])
+        self.assertIn("sata-1tb", browser_report["diskOptions"])
+        self.assertTrue(browser_report["keyboardReady"])
+        self.assertTrue(browser_report["mobileLayout"])
+        self.assertEqual(browser_report["mobileDisplay"], "grid")
+        self.assertEqual(browser_report["mobileColumns"], 1)
+        self.assertEqual(browser_report["compatibleStatus"], "Zestaw jest kompatybilny")
+        self.assertTrue(any(
+            issue["level"] == "info"
+            and "NVMe" in issue["text"]
+            and "dysk" in issue["text"].lower()
+            for issue in browser_report["compatibleIssues"]
+        ))
+        self.assertEqual(browser_report["diskValue"], "sata-1tb")
+        self.assertEqual(
+            browser_report["incompatibleRequest"]["selection"]["disk"],
+            "sata-1tb",
+        )
+        self.assertEqual(browser_report["status"], "Zestaw wymaga zmian")
+        self.assertTrue(any(
+            issue["level"] == "blocking"
+            and "SATA" in issue["text"]
+            and "nie obsługuje" in issue["text"].lower()
+            for issue in browser_report["issues"]
+        ))
 
     def test_rejects_json_with_invalid_structure(self):
         request = Request(
