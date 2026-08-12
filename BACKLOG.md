@@ -31,3 +31,11 @@ Jako osoba składająca komputer chcę po ponownym otwarciu konfiguratora wróci
 - Dlaczego teraz: raport testera task-006 potwierdził działający wybór dysku, a PROJECT.md wskazuje trwałe konfiguracje jako kolejny etap po rozszerzeniu modelu o dyski.
 - Sprawdzenie: wybierz części w demie, zamknij przeglądarkę, ponownie otwórz demo w przeglądarce, a następnie potwierdź, że widoczny zestaw, koszt, budżet i ocena odpowiadają wcześniejszemu wyborowi.
 - Poza zakresem: wiele zapisanych zestawów, konta użytkowników, synchronizacja między urządzeniami i linki do udostępniania.
+
+## US-005 — Kupujący otwiera źródłową ofertę wybranej części  [nowa]
+
+Jako osoba rozważająca zakup zestawu chcę przejść z wybranej części do jej oferty w x-kom, żeby przed zakupem sprawdzić aktualną cenę i dostępność.
+
+- Dlaczego teraz: raport testera task-008 r1 potwierdził odtworzenie zachowanego zestawu wraz z jego oceną, a PROJECT.md wskazuje źródłową ofertę w x-kom jako najbliższy przyrost.
+- Sprawdzenie: uruchom demo, wybierz kompletny zestaw, otwórz ofertę jednej z wybranych części i potwierdź, że strona x-kom przedstawia odpowiadający jej produkt oraz pokazuje jego bieżącą cenę i dostępność.
+- Poza zakresem: automatyczny import i odświeżanie katalogu, historia cen, porównywanie sklepów oraz obsługa niedostępnych lub usuniętych ofert.
