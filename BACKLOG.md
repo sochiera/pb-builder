@@ -1,5 +1,13 @@
 # Backlog
 
+## US-006 — Składający udostępnia wybrany zestaw  [nowa]
+
+Jako osoba składająca komputer chcę przekazać wybrany zestaw drugiej osobie, żeby mogła zobaczyć ten sam dobór części i jego ocenę.
+
+- Dlaczego teraz: raport testera task-010 r2 potwierdził działające przejście do źródłowych ofert, a PROJECT.md wskazuje udostępnianie zestawu jako część celu docelowego.
+- Sprawdzenie: wybierz kompletny zestaw w demie, udostępnij go, otwórz otrzymany adres w innej przeglądarce i potwierdź, że widać te same części, koszt oraz ocenę.
+- Poza zakresem: konta użytkowników, wspólna edycja, synchronizacja późniejszych zmian i zarządzanie wieloma zapisanymi zestawami.
+
 ## US-001 — Składający sprawdza dopasowanie płyty do obudowy  [do weryfikacji]
 
 Jako osoba składająca komputer chcę dobrać obudowę i zobaczyć, czy mieści format wybranej płyty głównej, żeby uniknąć zakupu części, których nie da się razem zamontować.

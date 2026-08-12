@@ -10,7 +10,7 @@ Docelowo użytkownik wybiera części, otrzymuje wyjaśnioną ocenę techniczną
 
 ## Zobowiązanie z backlogu
 
-Dostarczone demo wybiera CPU, płytę, RAM, GPU, PSU, obudowę, chłodzenie i dysk. Na bieżąco pokazuje koszt, budżet oraz analizę socketu, typu RAM, złączy PCIe, zapasu mocy, prostego balansu CPU/GPU, formatu płyty, podstawki chłodzenia i możliwości podłączenia dysku. Zachowuje też wybrany zestaw między wizytami. Najbliższy przyrost pozwala przejść od wybranej części do jej źródłowej oferty w x-kom, aby sprawdzić bieżącą cenę i dostępność.
+Dostarczone demo wybiera CPU, płytę, RAM, GPU, PSU, obudowę, chłodzenie i dysk. Na bieżąco pokazuje koszt, budżet oraz analizę socketu, typu RAM, złączy PCIe, zapasu mocy, prostego balansu CPU/GPU, formatu płyty, podstawki chłodzenia i możliwości podłączenia dysku. Zachowuje też wybrany zestaw między wizytami i pozwala przejść od części do jej źródłowej oferty w x-kom. Najbliższy przyrost pozwala przekazać wybrany zestaw drugiej osobie do obejrzenia wraz z jego oceną.
 
 ## Wymagania
 
@@ -27,7 +27,7 @@ Dostarczone demo wybiera CPU, płytę, RAM, GPU, PSU, obudowę, chłodzenie i dy
 
 ## Pomysły opcjonalne i odłożone
 
-Pełny import i odświeżanie katalogu x-kom, wyszukiwanie ofert oraz historia cen, wszystkie kategorie komponentów, filtry kontekstowe, porównywarka, zapisywanie, linki udostępniania i warianty zestawu. Są kierunkiem do oceny po demo, nie obecnym zobowiązaniem.
+Pełny import i odświeżanie katalogu x-kom, wyszukiwanie ofert oraz historia cen, wszystkie kategorie komponentów, filtry kontekstowe, porównywarka, zapisywanie i warianty zestawu. Są kierunkiem do oceny po demo, nie obecnym zobowiązaniem.
 
 ## Prawdopodobne kolejne etapy
 
