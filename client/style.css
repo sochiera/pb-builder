@@ -14,6 +14,9 @@ h1 em { color: #427c69; font-style: normal; }
 label { display: block; margin-bottom: 21px; font-size: 14px; font-weight: 800; }
 label span { color: #64707b; font-weight: 400; }
 input, select { width: 100%; margin-top: 7px; border: 1px solid var(--line); border-radius: 3px; background: white; color: var(--ink); padding: 13px; font: 14px Manrope, sans-serif; }
+.component-field { margin-bottom: 21px; }
+.component-field label { margin-bottom: 0; }
+.offer-link { display: inline-block; margin-top: 8px; color: #28634f; font-size: 13px; font-weight: 700; }
 .summary { background: var(--blue); padding: 30px; }
 .status { display: flex; align-items: center; gap: 9px; margin-bottom: 28px; }
 #status-dot { width: 11px; height: 11px; border-radius: 50%; background: var(--red); }

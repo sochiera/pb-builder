@@ -403,6 +403,98 @@ let stage = "boot";
 """
 
 
+BROWSER_OFFERS_EXERCISE = """
+<script>
+let stage = "boot";
+
+const selectedState = () => Object.fromEntries(Array.from(
+  document.querySelectorAll("#component-fields select"),
+  (field) => [field.name, field.value],
+));
+
+const links = () => Object.fromEntries(Array.from(
+  document.querySelectorAll("a[data-offer-link]"),
+  (link) => [link.dataset.offerLink, {
+    href: link.href,
+    name: link.getAttribute("aria-label") || link.textContent.replace(/\\s/g, " ").trim(),
+    tabIndex: link.tabIndex,
+  }],
+));
+
+const keyboardFocus = () => Object.fromEntries(Array.from(
+  document.querySelectorAll("a[data-offer-link]"),
+  (link) => {
+    link.focus();
+    return [link.dataset.offerLink, document.activeElement === link];
+  },
+));
+
+const offersFor = async (selection) => {
+  const response = await fetch("/api/catalog");
+  const catalog = await response.json();
+  return Object.fromEntries(Object.entries(selection).map(([category, id]) => {
+    const part = catalog[category]?.find((item) => item.id === id);
+    return [category, { id, name: part?.name || null, offerUrl: part?.offerUrl || null }];
+  }));
+};
+
+(async () => {
+  try {
+    await waitFor(() =>
+      document.querySelectorAll("#component-fields select").length === 8 &&
+      document.querySelector("select[name=\\"disk\\"]") &&
+      visible("#total") !== "-"
+    );
+    const diskField = document.querySelector('select[name="disk"]');
+    window.__testRequests.length = 0;
+
+    stage = "initial offers";
+    const initialSelection = selectedState();
+    const initialOffers = await offersFor(initialSelection);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const initialLinks = links();
+    const initialKeyboardFocus = keyboardFocus();
+
+    stage = "changed analysis";
+    diskField.value = "sata-1tb";
+    diskField.dispatchEvent(new Event("input", { bubbles: true }));
+    const changedAnalysis = await waitFor(() => window.__testRequests.find((request) =>
+      request.selection &&
+      request.selection.disk === "sata-1tb" &&
+      request.budget === 5500
+    ));
+    await waitFor(() => visible("#status") === "Zestaw wymaga zmian" &&
+      issues().some((issue) =>
+        issue.level === "blocking" &&
+        issue.text.includes("SATA") &&
+        issue.text.toLowerCase().includes("nie obsługuje")
+      )
+    );
+    const changedSelection = selectedState();
+    const changedOffers = await offersFor(changedSelection);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const changedLinks = links();
+
+    publish("data-offers-browser-test", {
+      initialSelection,
+      initialOffers,
+      initialLinks,
+      initialKeyboardFocus,
+      changedSelection,
+      changedOffers,
+      changedLinks,
+      changedAnalysis,
+      changedStatus: visible("#status"),
+      changedTotal: visible("#total"),
+    });
+  } catch (error) {
+    publish("data-offers-browser-test-error", `${stage}: ${error.stack || error}`);
+  }
+})();
+</script>
+"""
+
+
 BROWSER_PERSISTENCE_EXERCISE = """
 <script>
 const persistencePhase = new URLSearchParams(window.location.search).get("phase");
@@ -442,6 +534,24 @@ const persistenceState = () => ({
   )),
   budget: Number(document.querySelector("#budget").value),
 });
+
+const offerLinks = () => Object.fromEntries(Array.from(
+  document.querySelectorAll("a[data-offer-link]"),
+  (link) => [link.dataset.offerLink, {
+    href: link.href,
+    name: link.getAttribute("aria-label") || link.textContent.replace(/\\s/g, " ").trim(),
+    tabIndex: link.tabIndex,
+  }],
+));
+
+const offersFor = async (selection) => {
+  const response = await fetch("/api/catalog");
+  const catalog = await response.json();
+  return Object.fromEntries(Object.entries(selection).map(([category, id]) => {
+    const part = catalog[category]?.find((item) => item.id === id);
+    return [category, { id, name: part?.name || null, offerUrl: part?.offerUrl || null }];
+  }));
+};
 
 const analysisRequestForState = () => {
   const state = persistenceState();
@@ -485,18 +595,21 @@ const setPersistenceField = (name, value) => {
       stage = "restore";
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
+    const state = persistenceState();
     const analysisRequest = await waitFor(() => analysisRequestForState());
 
     publish("data-persistence-test", {
       phase: persistencePhase,
-      ...persistenceState(),
+      ...state,
       analysisRequest,
+      offerParts: await offersFor(state.selection),
       total: visible("#total"),
       remaining: visible("#remaining"),
       power: visible("#power"),
       recommendedPower: visible("#recommended"),
       status: visible("#status"),
       issues: issues(),
+      offerLinks: offerLinks(),
     });
   } catch (error) {
     publish("data-persistence-test-error", `${stage}: ${error.stack || error}`);
@@ -512,6 +625,7 @@ class BrowserTestHandler(Handler):
             "/__browser_test__": BROWSER_EXERCISE,
             "/__cooler_test__": BROWSER_COOLER_EXERCISE,
             "/__disk_test__": BROWSER_DISK_EXERCISE,
+            "/__offers_test__": BROWSER_OFFERS_EXERCISE,
             "/__persistence_test__": BROWSER_PERSISTENCE_EXERCISE,
         }
         exercise = exercises.get(urlsplit(self.path).path)
@@ -1259,6 +1373,70 @@ class ServerTest(unittest.TestCase):
             for issue in browser_report["issues"]
         ))
 
+    def test_selected_parts_open_xkom_offers_in_browser(self):
+        result = self.run_browser_page(
+            "/__offers_test__",
+            result_attribute="data-offers-browser-test",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        error_match = re.search(r'data-offers-browser-test-error="([^"]+)"', result.stdout)
+        if error_match:
+            error = base64.b64decode(error_match.group(1)).decode()
+            self.fail(f"browser offer behavior test failed: {error}")
+
+        result_match = re.search(r'data-offers-browser-test="([^"]+)"', result.stdout)
+        self.assertIsNotNone(
+            result_match,
+            f"browser offer behavior test produced no result:\n{result.stderr}\n{result.stdout}",
+        )
+        browser_report = json.loads(base64.b64decode(result_match.group(1)).decode())
+
+        for label, selection_key, offers_key, links_key in (
+            ("initial selection", "initialSelection", "initialOffers", "initialLinks"),
+            ("changed selection", "changedSelection", "changedOffers", "changedLinks"),
+        ):
+            with self.subTest(offers=label):
+                selection = browser_report[selection_key]
+                offers = browser_report[offers_key]
+                links = browser_report[links_key]
+                self.assertEqual(
+                    set(offers),
+                    set(selection),
+                    f"{label} must have catalog offer data for every selected category",
+                )
+                self.assertEqual(
+                    set(links),
+                    set(selection),
+                    f"{label} must expose one offer link per selected category",
+                )
+                self.assertEqual(
+                    {category: part["offerUrl"] for category, part in offers.items()},
+                    {category: link["href"] for category, link in links.items()},
+                    f"{label} links must use the exact catalog offerUrl for each category",
+                )
+                for category, part in offers.items():
+                    with self.subTest(category=category):
+                        link = links[category]
+                        self.assertIn(part["name"], link["name"])
+                        self.assertGreaterEqual(link["tabIndex"], 0)
+
+        with self.subTest("offer links are keyboard focusable"):
+            self.assertEqual(
+                browser_report["initialKeyboardFocus"],
+                {category: True for category in browser_report["initialSelection"]},
+                "every initial offer link must accept keyboard focus",
+            )
+
+        with self.subTest("changing a part refreshes its offer link without corrupting analysis"):
+            self.assertEqual(
+                browser_report["changedAnalysis"]["selection"],
+                browser_report["changedSelection"],
+                "analysis must remain tied to the current selection after the link update",
+            )
+            self.assertEqual(browser_report["changedStatus"], "Zestaw wymaga zmian")
+            self.assertEqual(browser_report["changedTotal"], "6 152 zł")
+
     def test_reopen_restores_configuration_and_current_analysis(self):
         results = self.run_browser_persistence_pages()
         states = {
@@ -1340,6 +1518,28 @@ class ServerTest(unittest.TestCase):
                     expected,
                     "reopening the browser must analyze the restored selection and budget",
                 )
+
+                self.assertEqual(
+                    set(states[phase]["offerLinks"]),
+                    set(expected["selection"]),
+                    "reopening the browser must restore one offer link for every selected part",
+                )
+                self.assertEqual(
+                    {
+                        category: offer["offerUrl"]
+                        for category, offer in states[phase]["offerParts"].items()
+                    },
+                    {
+                        category: link["href"]
+                        for category, link in states[phase]["offerLinks"].items()
+                    },
+                    "restored offer links must match the offerUrl of every restored part",
+                )
+                for category, offer in states[phase]["offerParts"].items():
+                    with self.subTest(restored_offer=category):
+                        link = states[phase]["offerLinks"][category]
+                        self.assertIn(offer["name"], link["name"])
+                        self.assertGreaterEqual(link["tabIndex"], 0)
 
         expected_reports = {
             "restore-initial": {

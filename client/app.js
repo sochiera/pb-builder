@@ -4,7 +4,7 @@ const storageKey = "pc-builder-configuration";
 let catalog = {};
 let analysisVersion = 0;
 
-function money(value) { return `${value.toLocaleString("pl-PL")} zł`; }
+function money(value) { return `${String(value).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} zł`; }
 
 function selection() {
   return Object.fromEntries(categoryFields.map(([category]) => [
@@ -49,11 +49,29 @@ function restoreConfiguration() {
   }
 }
 
+function selectedPart(category) {
+  const field = document.querySelector(`[name="${category}"]`);
+  return catalog[category].find((part) => part.id === field.value);
+}
+
 function renderCatalog() {
   const fields = document.querySelector("#component-fields");
   fields.innerHTML = categoryFields.map(([category, label]) => `
-    <label>${label}<select name="${category}">${catalog[category].map((part, index) =>
-      `<option value="${part.id}" ${index === 0 ? "selected" : ""}>${part.name} | ${money(part.price)}</option>`).join("")}</select></label>`).join("");
+    <div class="component-field">
+      <label>${label}<select name="${category}">${catalog[category].map((part, index) =>
+        `<option value="${part.id}" ${index === 0 ? "selected" : ""}>${part.name} | ${money(part.price)}</option>`).join("")}</select></label>
+      <a class="offer-link" data-offer-link="${category}" target="_blank" rel="noopener noreferrer">Oferta x-kom</a>
+    </div>`).join("");
+}
+
+function updateOfferLinks() {
+  categoryFields.forEach(([category, label]) => {
+    const part = selectedPart(category);
+    const link = document.querySelector(`[data-offer-link="${category}"]`);
+    link.href = part.offerUrl;
+    link.textContent = `Otwórz ofertę x-kom: ${part.name}`;
+    link.setAttribute("aria-label", `Oferta x-kom: ${label} ${part.name}`);
+  });
 }
 
 async function refresh() {
@@ -75,7 +93,9 @@ async function boot() {
   catalog = await fetch("/api/catalog").then((response) => response.json());
   renderCatalog();
   restoreConfiguration();
+  updateOfferLinks();
   document.querySelector("#builder").addEventListener("input", () => {
+    updateOfferLinks();
     saveConfiguration();
     refresh();
   });

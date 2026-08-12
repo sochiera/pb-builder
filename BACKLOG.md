@@ -32,7 +32,7 @@ Jako osoba składająca komputer chcę po ponownym otwarciu konfiguratora wróci
 - Sprawdzenie: wybierz części w demie, zamknij przeglądarkę, ponownie otwórz demo w przeglądarce, a następnie potwierdź, że widoczny zestaw, koszt, budżet i ocena odpowiadają wcześniejszemu wyborowi.
 - Poza zakresem: wiele zapisanych zestawów, konta użytkowników, synchronizacja między urządzeniami i linki do udostępniania.
 
-## US-005 — Kupujący otwiera źródłową ofertę wybranej części  [w toku]
+## US-005 — Kupujący otwiera źródłową ofertę wybranej części  [do weryfikacji]
 
 Jako osoba rozważająca zakup zestawu chcę przejść z wybranej części do jej oferty w x-kom, żeby przed zakupem sprawdzić aktualną cenę i dostępność.
 
