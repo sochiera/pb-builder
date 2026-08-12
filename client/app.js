@@ -6,10 +6,14 @@ let analysisVersion = 0;
 
 function money(value) { return `${String(value).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} zł`; }
 
+function field(category) {
+  return document.querySelector(`[name="${category}"]`);
+}
+
 function selection() {
   return Object.fromEntries(categoryFields.map(([category]) => [
     category,
-    document.querySelector(`[name="${category}"]`).value,
+    field(category).value,
   ]));
 }
 
@@ -39,9 +43,9 @@ function restoreConfiguration() {
 
   categoryFields.forEach(([category]) => {
     const value = saved.selection?.[category];
-    const field = document.querySelector(`[name="${category}"]`);
-    if (typeof value === "string" && Array.from(field.options).some((option) => option.value === value)) {
-      field.value = value;
+    const select = field(category);
+    if (typeof value === "string" && Array.from(select.options).some((option) => option.value === value)) {
+      select.value = value;
     }
   });
   if (Number.isFinite(saved.budget)) {
@@ -50,8 +54,7 @@ function restoreConfiguration() {
 }
 
 function selectedPart(category) {
-  const field = document.querySelector(`[name="${category}"]`);
-  return catalog[category].find((part) => part.id === field.value);
+  return catalog[category].find((part) => part.id === field(category).value);
 }
 
 function renderCatalog() {
