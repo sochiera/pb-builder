@@ -1479,6 +1479,117 @@ class ServerTest(unittest.TestCase):
             for item in catalog["motherboard"]
         ))
 
+    def test_catalog_exposes_xkom_offer_urls_for_every_selectable_part(self):
+        with urlopen(f"{self.base_url}/api/catalog") as response:
+            catalog = json.loads(response.read().decode())
+
+        expected_offer_urls = {
+            ("cpu", "r5-7600"): "https://www.x-kom.pl/p/1105320-procesor-amd-ryzen-5-amd-ryzen-5-7600.html",
+            ("cpu", "r7-7800x3d"): "https://www.x-kom.pl/p/1117011-procesor-amd-ryzen-7-amd-ryzen-7-7800x3d.html",
+            ("motherboard", "b650m"): "https://www.x-kom.pl/p/1243711-plyta-glowna-socket-am5-msi-b650m-gaming-plus-wifi.html",
+            ("motherboard", "b550"): "https://www.x-kom.pl/p/569338-plyta-glowna-socket-am4-asus-tuf-gaming-b550-plus.html",
+            ("case", "m-atx-compact"): "https://www.x-kom.pl/p/1184558-obudowa-do-komputera-cooler-master-q300l-v2.html",
+            ("case", "atx-airflow"): "https://www.x-kom.pl/p/1155958-obudowa-do-komputera-endorfy-arx-500-air.html",
+            ("cooler", "fortis-5"): "https://www.x-kom.pl/p/1075146-chlodzenie-procesora-endorfy-fortis-5-140mm.html",
+            ("cooler", "alpine-23"): "https://www.x-kom.pl/p/740658-chlodzenie-procesora-arctic-alpine-23-90mm.html",
+            ("disk", "nvme-1tb"): "https://www.x-kom.pl/p/1273429-dysk-ssd-kingston-1tb-m2-pcie-gen4-nvme-nv3.html",
+            ("disk", "sata-1tb"): "https://www.x-kom.pl/p/400626-dysk-ssd-crucial-1tb-25-sata-ssd-mx500.html",
+            ("ram", "ddr5-32"): "https://www.x-kom.pl/p/1283005-pamiec-ram-ddr5-kingston-fury-32gb-2x16gb-6000mhz-cl36-beast-black.html",
+            ("ram", "ddr4-32"): "https://www.x-kom.pl/p/656654-pamiec-ram-ddr4-corsair-32gb-2x16gb-3600mhz-cl18-vengeance-lpx.html",
+            ("gpu", "rtx-5070"): "https://www.x-kom.pl/p/1318534-karta-graficzna-nvidia-gigabyte-geforce-rtx-5070-windforce-oc-12gb-gddr7-dlss4.html",
+            ("gpu", "rtx-5060"): "https://www.x-kom.pl/p/1332820-karta-graficzna-nvidia-asus-geforce-rtx-5060-dual-oc-8gb-gddr7-dlss4.html",
+            ("psu", "650w"): "https://www.x-kom.pl/p/1114798-zasilacz-do-komputera-be-quiet-pure-power-12-m-650w-80-plus-gold.html",
+            ("psu", "550w"): "https://www.x-kom.pl/p/1216563-zasilacz-do-komputera-corsair-cx550-550w-80-plus-bronze.html",
+        }
+        actual_parts = {
+            (category, item.get("id"))
+            for category, items in catalog.items()
+            for item in items
+        }
+        self.assertEqual(
+            actual_parts,
+            set(expected_offer_urls),
+            "catalog must expose every selectable part covered by the offer contract",
+        )
+        expected_catalog_names = {
+            ("case", "atx-airflow"): "Endorfy Arx 500 Air",
+        }
+
+        for category, items in catalog.items():
+            for item in items:
+                key = (category, item.get("id"))
+                with self.subTest(part=f"{category}/{item.get('id')}"):
+                    self.assertIn(key, expected_offer_urls, "selectable catalog item lacks a canonical offer expectation")
+                    self.assertIn("offerUrl", item, "catalog item must publish its source offer URL")
+                    offer_url = item.get("offerUrl")
+                    self.assertIsInstance(offer_url, str, "offerUrl must be a non-empty URL string")
+                    self.assertTrue(offer_url, "offerUrl must be a non-empty URL string")
+                    self.assertEqual(
+                        offer_url,
+                        expected_offer_urls[key],
+                        "offerUrl must be the verified canonical x-kom offer for the catalog product",
+                    )
+                    if key in expected_catalog_names:
+                        self.assertEqual(
+                            item.get("name"),
+                            expected_catalog_names[key],
+                            "catalog name must match the product named by the canonical x-kom offer",
+                        )
+                    parsed = urlsplit(offer_url)
+                    self.assertEqual(parsed.scheme, "https", "offerUrl must use HTTPS")
+                    self.assertIn(parsed.hostname, {"x-kom.pl", "www.x-kom.pl"}, "offerUrl must target x-kom")
+                    self.assertTrue(parsed.path.startswith("/p/"), "offerUrl must point to an x-kom product offer")
+
+    def test_public_analysis_result_remains_unchanged_for_catalog_selection(self):
+        selection = {
+            "cpu": "r5-7600",
+            "motherboard": "b650m",
+            "case": "m-atx-compact",
+            "cooler": "fortis-5",
+            "disk": "nvme-1tb",
+            "ram": "ddr5-32",
+            "gpu": "rtx-5070",
+            "psu": "650w",
+        }
+        request = Request(
+            f"{self.base_url}/api/analyze",
+            data=json.dumps({"selection": selection, "budget": 7000}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(request) as response:
+            report = json.loads(response.read().decode())
+
+        self.assertEqual(report, {
+            "issues": [
+                {
+                    "level": "info",
+                    "message": "Obudowa obsługuje płytę główną w formacie Micro-ATX.",
+                },
+                {
+                    "level": "info",
+                    "message": "Chłodzenie Endorfy Fortis 5 obsługuje podstawkę AM5 procesora.",
+                },
+                {
+                    "level": "info",
+                    "message": "Płyta główna obsługuje dysk z interfejsem NVMe.",
+                },
+                {
+                    "level": "info",
+                    "message": "Zasilacz zapewnia zapas dla szacowanego zapotrzebowania 550 W.",
+                },
+                {
+                    "level": "warning",
+                    "message": "Karta graficzna jest wyraźnie mocniejsza od procesora; w grach CPU może ograniczać jej wydajność.",
+                },
+            ],
+            "total": 6122,
+            "power": 393,
+            "recommendedPower": 550,
+            "remainingBudget": 878,
+            "isCompatible": True,
+        }, "public analysis must preserve the existing result for the same selection and budget")
+
     def test_accepts_cooler_that_supports_cpu_socket(self):
         with urlopen(f"{self.base_url}/api/catalog") as response:
             catalog = json.loads(response.read().decode())

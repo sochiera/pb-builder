@@ -10,39 +10,61 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 CLIENT_DIR = Path(__file__).parent / "client"
+XKOM_OFFER_URLS = {
+    "r5-7600": "https://www.x-kom.pl/p/1105320-procesor-amd-ryzen-5-amd-ryzen-5-7600.html",
+    "r7-7800x3d": "https://www.x-kom.pl/p/1117011-procesor-amd-ryzen-7-amd-ryzen-7-7800x3d.html",
+    "b650m": "https://www.x-kom.pl/p/1243711-plyta-glowna-socket-am5-msi-b650m-gaming-plus-wifi.html",
+    "b550": "https://www.x-kom.pl/p/569338-plyta-glowna-socket-am4-asus-tuf-gaming-b550-plus.html",
+    "m-atx-compact": "https://www.x-kom.pl/p/1184558-obudowa-do-komputera-cooler-master-q300l-v2.html",
+    "atx-airflow": "https://www.x-kom.pl/p/1155958-obudowa-do-komputera-endorfy-arx-500-air.html",
+    "fortis-5": "https://www.x-kom.pl/p/1075146-chlodzenie-procesora-endorfy-fortis-5-140mm.html",
+    "alpine-23": "https://www.x-kom.pl/p/740658-chlodzenie-procesora-arctic-alpine-23-90mm.html",
+    "nvme-1tb": "https://www.x-kom.pl/p/1273429-dysk-ssd-kingston-1tb-m2-pcie-gen4-nvme-nv3.html",
+    "sata-1tb": "https://www.x-kom.pl/p/400626-dysk-ssd-crucial-1tb-25-sata-ssd-mx500.html",
+    "ddr5-32": "https://www.x-kom.pl/p/1283005-pamiec-ram-ddr5-kingston-fury-32gb-2x16gb-6000mhz-cl36-beast-black.html",
+    "ddr4-32": "https://www.x-kom.pl/p/656654-pamiec-ram-ddr4-corsair-32gb-2x16gb-3600mhz-cl18-vengeance-lpx.html",
+    "rtx-5070": "https://www.x-kom.pl/p/1318534-karta-graficzna-nvidia-gigabyte-geforce-rtx-5070-windforce-oc-12gb-gddr7-dlss4.html",
+    "rtx-5060": "https://www.x-kom.pl/p/1332820-karta-graficzna-nvidia-asus-geforce-rtx-5060-dual-oc-8gb-gddr7-dlss4.html",
+    "650w": "https://www.x-kom.pl/p/1114798-zasilacz-do-komputera-be-quiet-pure-power-12-m-650w-80-plus-gold.html",
+    "550w": "https://www.x-kom.pl/p/1216563-zasilacz-do-komputera-corsair-cx550-550w-80-plus-bronze.html",
+}
+
+
+def xkom_offer(catalog_id: str) -> str:
+    return XKOM_OFFER_URLS[catalog_id]
 
 CATALOG = {
     "cpu": [
-        {"id": "r5-7600", "name": "AMD Ryzen 5 7600", "price": 829, "socket": "AM5", "power": 88, "tier": 3},
-        {"id": "r7-7800x3d", "name": "AMD Ryzen 7 7800X3D", "price": 1599, "socket": "AM5", "power": 120, "tier": 5},
+        {"id": "r5-7600", "name": "AMD Ryzen 5 7600", "price": 829, "socket": "AM5", "power": 88, "tier": 3, "offerUrl": xkom_offer("r5-7600")},
+        {"id": "r7-7800x3d", "name": "AMD Ryzen 7 7800X3D", "price": 1599, "socket": "AM5", "power": 120, "tier": 5, "offerUrl": xkom_offer("r7-7800x3d")},
     ],
     "motherboard": [
-        {"id": "b650m", "name": "MSI B650M Gaming Plus WiFi", "price": 639, "socket": "AM5", "ram": "DDR5", "formFactor": "Micro-ATX", "supportedStorageInterfaces": ["NVMe"], "power": 45},
-        {"id": "b550", "name": "ASUS TUF Gaming B550-Plus", "price": 589, "socket": "AM4", "ram": "DDR4", "formFactor": "ATX", "supportedStorageInterfaces": ["NVMe", "SATA"], "power": 40},
+        {"id": "b650m", "name": "MSI B650M Gaming Plus WiFi", "price": 639, "socket": "AM5", "ram": "DDR5", "formFactor": "Micro-ATX", "supportedStorageInterfaces": ["NVMe"], "power": 45, "offerUrl": xkom_offer("b650m")},
+        {"id": "b550", "name": "ASUS TUF Gaming B550-Plus", "price": 589, "socket": "AM4", "ram": "DDR4", "formFactor": "ATX", "supportedStorageInterfaces": ["NVMe", "SATA"], "power": 40, "offerUrl": xkom_offer("b550")},
     ],
     "case": [
-        {"id": "m-atx-compact", "name": "Cooler Master Q300L V2", "price": 249, "supportedFormFactors": ["Micro-ATX", "Mini-ITX"]},
-        {"id": "atx-airflow", "name": "Endorfy Ventum 500 Air", "price": 329, "supportedFormFactors": ["ATX", "Micro-ATX", "Mini-ITX"]},
+        {"id": "m-atx-compact", "name": "Cooler Master Q300L V2", "price": 249, "supportedFormFactors": ["Micro-ATX", "Mini-ITX"], "offerUrl": xkom_offer("m-atx-compact")},
+        {"id": "atx-airflow", "name": "Endorfy Arx 500 Air", "price": 329, "supportedFormFactors": ["ATX", "Micro-ATX", "Mini-ITX"], "offerUrl": xkom_offer("atx-airflow")},
     ],
     "cooler": [
-        {"id": "fortis-5", "name": "Endorfy Fortis 5", "price": 219, "supportedSockets": ["AM4", "AM5"]},
-        {"id": "alpine-23", "name": "Arctic Alpine 23", "price": 119, "supportedSockets": ["AM4"]},
+        {"id": "fortis-5", "name": "Endorfy Fortis 5", "price": 219, "supportedSockets": ["AM4", "AM5"], "offerUrl": xkom_offer("fortis-5")},
+        {"id": "alpine-23", "name": "Arctic Alpine 23", "price": 119, "supportedSockets": ["AM4"], "offerUrl": xkom_offer("alpine-23")},
     ],
     "disk": [
-        {"id": "nvme-1tb", "name": "Kingston NV3 1 TB", "price": 299, "interface": "NVMe"},
-        {"id": "sata-1tb", "name": "Crucial MX500 1 TB", "price": 329, "interface": "SATA"},
+        {"id": "nvme-1tb", "name": "Kingston NV3 1 TB", "price": 299, "interface": "NVMe", "offerUrl": xkom_offer("nvme-1tb")},
+        {"id": "sata-1tb", "name": "Crucial MX500 1 TB", "price": 329, "interface": "SATA", "offerUrl": xkom_offer("sata-1tb")},
     ],
     "ram": [
-        {"id": "ddr5-32", "name": "Kingston Fury 32 GB (2x16) DDR5-6000", "price": 519, "type": "DDR5", "modules": 2, "power": 10},
-        {"id": "ddr4-32", "name": "Corsair Vengeance 32 GB (2x16) DDR4-3600", "price": 299, "type": "DDR4", "modules": 2, "power": 10},
+        {"id": "ddr5-32", "name": "Kingston Fury 32 GB (2x16) DDR5-6000", "price": 519, "type": "DDR5", "modules": 2, "power": 10, "offerUrl": xkom_offer("ddr5-32")},
+        {"id": "ddr4-32", "name": "Corsair Vengeance 32 GB (2x16) DDR4-3600", "price": 299, "type": "DDR4", "modules": 2, "power": 10, "offerUrl": xkom_offer("ddr4-32")},
     ],
     "gpu": [
-        {"id": "rtx-5070", "name": "Gigabyte RTX 5070 Windforce OC 12 GB", "price": 2899, "power": 250, "tier": 5, "connectors": 2},
-        {"id": "rtx-5060", "name": "ASUS Dual RTX 5060 8 GB", "price": 1699, "power": 145, "tier": 3, "connectors": 1},
+        {"id": "rtx-5070", "name": "Gigabyte RTX 5070 Windforce OC 12 GB", "price": 2899, "power": 250, "tier": 5, "connectors": 2, "offerUrl": xkom_offer("rtx-5070")},
+        {"id": "rtx-5060", "name": "ASUS Dual RTX 5060 8 GB", "price": 1699, "power": 145, "tier": 3, "connectors": 1, "offerUrl": xkom_offer("rtx-5060")},
     ],
     "psu": [
-        {"id": "650w", "name": "be quiet! Pure Power 12 M 650 W", "price": 469, "watts": 650, "pcie": 2},
-        {"id": "550w", "name": "Corsair CX550 550 W", "price": 319, "watts": 550, "pcie": 1},
+        {"id": "650w", "name": "be quiet! Pure Power 12 M 650 W", "price": 469, "watts": 650, "pcie": 2, "offerUrl": xkom_offer("650w")},
+        {"id": "550w", "name": "Corsair CX550 550 W", "price": 319, "watts": 550, "pcie": 1, "offerUrl": xkom_offer("550w")},
     ],
 }
 
